@@ -50,8 +50,8 @@ if (!isMobile && diamondCursor) {
 
 // ---------- Orbit sabitleri ----------
 const CAM_H   = 1.8;
-const ORBIT_R = isMobile ? 8 : 4;
-const ORBIT_N = isMobile ? 20 : 32;
+const ORBIT_R = 4;
+const ORBIT_N = 32;
 
 // ---------- Kamera yolu ----------
 function buildPath() {
@@ -61,33 +61,19 @@ function buildPath() {
   pts.push(new THREE.Vector3(0, h, 10));
   pts.push(new THREE.Vector3(0, h,  7));
 
-  if (isMobile) {
-    // Mobile: gentle S-curve past each model — no orbit, no clipping risk
-    MODEL_DEFS.forEach((def, i) => {
-      const mz = def.z;
-      const side = i % 2 === 0 ? 1 : -1; // alternate left/right each model
-      pts.push(new THREE.Vector3(0,            h, mz + r));        // approach front
-      pts.push(new THREE.Vector3(side * r * 0.65, h, mz + r * 0.3)); // lean to side
-      pts.push(new THREE.Vector3(side * r * 0.55, h, mz));           // alongside
-      pts.push(new THREE.Vector3(side * r * 0.3,  h, mz - r * 0.4)); // exit angle
-      pts.push(new THREE.Vector3(0,            h, mz - r));        // exit behind
-    });
-  } else {
-    // Desktop: full 360° orbit around each model
-    MODEL_DEFS.forEach((def, i) => {
-      const mz = def.z;
-      for (let s = 0; s <= ORBIT_N; s++) {
-        const a = (s / ORBIT_N) * Math.PI * 2;
-        pts.push(new THREE.Vector3(Math.sin(a) * r, h, mz + Math.cos(a) * r));
-      }
-      if (i < MODEL_DEFS.length - 1) {
-        const nextZ = MODEL_DEFS[i + 1].z;
-        pts.push(new THREE.Vector3(r * 1.5, h, mz));
-        pts.push(new THREE.Vector3(r * 0.8, h, mz - r - 1));
-        pts.push(new THREE.Vector3(0,       h, nextZ + r + 1));
-      }
-    });
-  }
+  MODEL_DEFS.forEach((def, i) => {
+    const mz = def.z;
+    for (let s = 0; s <= ORBIT_N; s++) {
+      const a = (s / ORBIT_N) * Math.PI * 2;
+      pts.push(new THREE.Vector3(Math.sin(a) * r, h, mz + Math.cos(a) * r));
+    }
+    if (i < MODEL_DEFS.length - 1) {
+      const nextZ = MODEL_DEFS[i + 1].z;
+      pts.push(new THREE.Vector3(r * 1.5, h, mz));
+      pts.push(new THREE.Vector3(r * 0.8, h, mz - r - 1));
+      pts.push(new THREE.Vector3(0,       h, nextZ + r + 1));
+    }
+  });
 
   // Projection approach — same for both
   const lastZ = MODEL_DEFS[MODEL_DEFS.length - 1].z;
@@ -356,7 +342,12 @@ function tick(now = 0) {
 
   // Camera spline
   _camTarget.copy(camPath.getPoint(splineT));
-  camera.position.lerp(_camTarget, 0.07);
+  // Mobile: snap to spline — no lerp shortcutting through models on fast scroll
+  if (isMobile) {
+    camera.position.copy(_camTarget);
+  } else {
+    camera.position.lerp(_camTarget, 0.07);
+  }
 
   const { def: near, dist } = findNearest(camera.position);
   const inOrbit      = near && dist < ORBIT_R + 1.5;
@@ -452,7 +443,7 @@ async function boot() {
   breathe.kill();
   await gsap.to(loadingWordmark, { opacity: 1, duration: 0.4, ease: "power2.out" });
   // Extra wait on mobile — lets GPU finish compiling shaders before showing scene
-  await new Promise(r => setTimeout(r, isMobile ? 4000 : 300));
+  await new Promise(r => setTimeout(r, isMobile ? 2000 : 300));
   loadingEl.classList.add("hidden");
 
   // Intro animation: ease camera forward into scene
