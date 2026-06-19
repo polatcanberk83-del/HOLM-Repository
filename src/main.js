@@ -50,8 +50,8 @@ if (!isMobile && diamondCursor) {
 
 // ---------- Orbit sabitleri ----------
 const CAM_H   = 1.8;
-const ORBIT_R = isMobile ? 5.5 : 4;
-const ORBIT_N = isMobile ? 24 : 32;
+const ORBIT_R = isMobile ? 8 : 4;
+const ORBIT_N = isMobile ? 20 : 32;
 
 // ---------- Kamera yolu ----------
 function buildPath() {
@@ -401,7 +401,12 @@ function tick(now = 0) {
     diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
   }
 
-  post.composer.render();
+  // Skip EffectComposer on mobile — direct render is ~2x faster
+  if (isMobile) {
+    renderer.render(scene, camera);
+  } else {
+    post.composer.render();
+  }
 }
 
 // ---------- Resize ----------
@@ -439,7 +444,8 @@ async function boot() {
   // Stop breathing, snap to full opacity, then fade the whole screen out
   breathe.kill();
   await gsap.to(loadingWordmark, { opacity: 1, duration: 0.4, ease: "power2.out" });
-  await new Promise(r => setTimeout(r, 300));
+  // Extra wait on mobile — lets GPU finish compiling shaders before showing scene
+  await new Promise(r => setTimeout(r, isMobile ? 1800 : 300));
   loadingEl.classList.add("hidden");
 
   // Intro animation: ease camera forward into scene
