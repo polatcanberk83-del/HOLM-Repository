@@ -31,6 +31,10 @@
         pointer-events: none;
       }
 
+      @media (max-width: 767px) {
+        .scroll-spacer { height: 850vh; }
+      }
+
       /* ── Caption ─────────────────────────────────────────────────── */
       .caption-layer {
         position: fixed;
@@ -272,25 +276,26 @@
         /* Loading */
         #loading-wordmark {
           font-size: 1.8rem;
-          letter-spacing: 0.2em;
-          gap: 0.3em;
+          letter-spacing: 0.22em;
+          gap: 0.35em;
         }
         #loading-wordmark svg { width: 18px; height: 18px; }
 
-        /* Caption */
-        .caption-layer { bottom: 10vh; }
+        /* Caption — pushed higher so it breathes above thumb zone */
+        .caption-layer { bottom: 14vh; }
         .caption {
-          font-size: clamp(0.85rem, 4.5vw, 1.2rem);
-          max-width: 88vw;
-          letter-spacing: 0.02em;
+          font-size: clamp(0.9rem, 4.8vw, 1.2rem);
+          max-width: 84vw;
+          letter-spacing: 0.025em;
+          line-height: 1.6;
         }
 
-        /* Wordmark */
+        /* Wordmark — more top space */
         .wordmark {
-          font-size: 0.85rem;
-          top: 4vh;
-          left: 4vw;
-          gap: 0.45em;
+          font-size: 0.9rem;
+          top: 5vh;
+          left: 5vw;
+          gap: 0.5em;
         }
         .wordmark svg { width: 9px; height: 9px; }
 
@@ -298,34 +303,34 @@
         .scroll-hint {
           font-size: 0.55rem;
           letter-spacing: 0.18em;
-          bottom: 3.5vh;
+          bottom: 5vh;
         }
 
-        /* Projection overlay — reset desktop top-padding, side padding */
+        /* Projection overlay */
         #projection-overlay {
           padding-top: 0;
           padding-bottom: 0;
-          padding-left: 1.8rem;
-          padding-right: 1.8rem;
+          padding-left: 2rem;
+          padding-right: 2rem;
         }
         .proj-content {
           max-width: 100%;
           padding: 0;
         }
-        /* Suppress manual line breaks — let text rewrap naturally */
         .proj-line br { display: none; }
         .proj-line {
-          font-size: clamp(0.82rem, 4vw, 1rem);
-          line-height: 1.72;
-          margin-bottom: 0.75em;
+          font-size: clamp(0.88rem, 4.2vw, 1.05rem);
+          line-height: 1.8;
+          margin-bottom: 0.9em;
         }
         .proj-cta {
           display: block;
           width: 100%;
           text-align: center;
-          padding: 16px 24px;
-          font-size: 0.85rem;
-          margin-top: 1.8rem;
+          padding: 18px 24px;
+          font-size: 0.88rem;
+          margin-top: 2.2rem;
+          letter-spacing: 0.14em;
         }
         .proj-cta-text-hover { display: none; }
         #diamond-cursor { display: none; }
@@ -338,7 +343,7 @@
         .proj-line { font-size: clamp(0.76rem, 3.8vw, 0.9rem); }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-CQncKy5P.js"></script>
+    <script type="module" crossorigin src="/assets/index-BXk03LJk.js"></script>
   </head>
   <body>
     <div class="loading-screen" id="loading">
