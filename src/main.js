@@ -299,8 +299,8 @@ function hideProjection() {
 if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
 const lenis = new Lenis(isMobile ? {
   smoothTouch:     true,
-  touchMultiplier: 0.18,
-  lerp:            0.022,
+  touchMultiplier: 0.06,
+  lerp:            0.012,
   smoothWheel:     true,
   wheelMultiplier: 0.28,
 } : {
