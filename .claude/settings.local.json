@@ -1,0 +1,16 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vite *)",
+      "Bash(node -e \"require\\('fs'\\).existsSync\\('./node_modules/three/examples/jsm/postprocessing/ShaderPass.js'\\) ? console.log\\('OK'\\) : console.log\\('MISSING'\\)\")",
+      "Bash(robocopy \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site\" \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site-v1\" /E /XD node_modules .git /NP /NFL /NDL)",
+      "Bash(robocopy \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site\" \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site-v1\" /E /XD node_modules .git /NP)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site-v1\" -Force | ForEach-Object { $_.Name })",
+      "Bash(Get-Content \"C:\\\\Users\\\\MELIHA~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Melih--ak-r-Desktop-holm-site\\\\9b175a08-ebab-4a74-aed7-9c16ad198643\\\\tasks\\\\bu7fbna7e.output\")"
+    ],
+    "additionalDirectories": [
+      "c:\\Users\\Melih Çakır\\.claude\\projects\\c--Users-Melih--ak-r-Desktop-holm-site\\memory",
+      "C:\\Users\\Melih �ak�r\\Desktop"
+    ]
+  }
+}
