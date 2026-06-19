@@ -50,7 +50,7 @@ if (!isMobile && diamondCursor) {
 
 // ---------- Orbit sabitleri ----------
 const CAM_H   = 1.8;
-const ORBIT_R = 4;
+const ORBIT_R = isMobile ? 5 : 4;
 const ORBIT_N = 32;
 
 // ---------- Kamera yolu ----------
@@ -297,8 +297,14 @@ function hideProjection() {
 
 // ---------- Lenis ----------
 if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
-const lenis = new Lenis({
-  duration:        isMobile ? 2.5 : 4.0,
+const lenis = new Lenis(isMobile ? {
+  smoothTouch:     true,
+  touchMultiplier: 0.55,
+  lerp:            0.04,
+  smoothWheel:     true,
+  wheelMultiplier: 0.28,
+} : {
+  duration:        4.0,
   smoothWheel:     true,
   wheelMultiplier: 0.28,
   touchMultiplier: 1.2,
