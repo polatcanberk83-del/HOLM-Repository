@@ -3,7 +3,7 @@ import * as THREE from "three";
 export function createScene(canvas, isMobile = false) {
   // ---------- Renderer ----------
   const renderer = new THREE.WebGLRenderer({ canvas, antialias: !isMobile });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.5 : 2));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.0 : 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping        = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 6.5;
@@ -75,7 +75,7 @@ export function createScene(canvas, isMobile = false) {
   // Her model pozisyonunda sabit dolgu ışığı (Z=0,-12,-24,-36,-48,-60)
   // Spotlight aktif modeli aydınlatırken diğerleri bu ışıkla siluet verir.
   // Fill lights on left/right walls so they light the room without blasting models from above
-  [0, -12, -24, -36, -48].forEach(z => {
+  (isMobile ? [0, -24, -48] : [0, -12, -24, -36, -48]).forEach(z => {
     [-8, 8].forEach(x => {
       const fill = new THREE.PointLight(0x3a5080, 4000, 28, 2);
       fill.position.set(x, 4, z);
@@ -83,14 +83,16 @@ export function createScene(canvas, isMobile = false) {
     });
   });
 
-  // Corridor lights — guide the eye from last model to projection wall
-  [-58, -68, -78].forEach(z => {
-    [-7, 7].forEach(x => {
-      const c = new THREE.PointLight(0x3a5080, 1800, 22, 2);
-      c.position.set(x, 4, z);
-      scene.add(c);
+  // Corridor lights
+  if (!isMobile) {
+    [-58, -68, -78].forEach(z => {
+      [-7, 7].forEach(x => {
+        const c = new THREE.PointLight(0x3a5080, 1800, 22, 2);
+        c.position.set(x, 4, z);
+        scene.add(c);
+      });
     });
-  });
+  }
 
   // Warm glow near the projection wall
   const wallGlow = new THREE.PointLight(0x5070b0, 3000, 30, 2);

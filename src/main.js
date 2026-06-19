@@ -50,8 +50,8 @@ if (!isMobile && diamondCursor) {
 
 // ---------- Orbit sabitleri ----------
 const CAM_H   = 1.8;
-const ORBIT_R = 4;
-const ORBIT_N = 32;
+const ORBIT_R = isMobile ? 5.5 : 4;
+const ORBIT_N = isMobile ? 24 : 32;
 
 // ---------- Kamera yolu ----------
 function buildPath() {
@@ -223,30 +223,29 @@ async function loadAllModels() {
       // Shadows + hover distortion material
       model.traverse(c => {
         if (!c.isMesh) return;
-        c.castShadow = c.receiveShadow = true;
+        c.castShadow = c.receiveShadow = !isMobile;
 
-        const mat      = c.material.clone();
-        const uniforms = { uTime: { value: 0 }, uIntensity: { value: 0 } };
-
-        mat.onBeforeCompile = shader => {
-          shader.uniforms.uTime      = uniforms.uTime;
-          shader.uniforms.uIntensity = uniforms.uIntensity;
-          // Declare uniforms then inject displacement after <begin_vertex>
-          shader.vertexShader =
-            "uniform float uTime;\nuniform float uIntensity;\n" +
-            shader.vertexShader.replace(
-              "#include <begin_vertex>",
-              `#include <begin_vertex>
-               float _w = sin(position.x * 4.0 + uTime * 1.3)
-                        * sin(position.y * 3.5 + uTime * 0.9)
-                        * 0.015 * uIntensity;
-               transformed += normal * _w;`,
-            );
-        };
-        mat.customProgramCacheKey = () => "holm_distort";
-
-        c.material = mat;
-        distortItems.push({ mesh: c, uniforms, defZ: def.z });
+        if (!isMobile) {
+          const mat      = c.material.clone();
+          const uniforms = { uTime: { value: 0 }, uIntensity: { value: 0 } };
+          mat.onBeforeCompile = shader => {
+            shader.uniforms.uTime      = uniforms.uTime;
+            shader.uniforms.uIntensity = uniforms.uIntensity;
+            shader.vertexShader =
+              "uniform float uTime;\nuniform float uIntensity;\n" +
+              shader.vertexShader.replace(
+                "#include <begin_vertex>",
+                `#include <begin_vertex>
+                 float _w = sin(position.x * 4.0 + uTime * 1.3)
+                          * sin(position.y * 3.5 + uTime * 0.9)
+                          * 0.015 * uIntensity;
+                 transformed += normal * _w;`,
+              );
+          };
+          mat.customProgramCacheKey = () => "holm_distort";
+          c.material = mat;
+          distortItems.push({ mesh: c, uniforms, defZ: def.z });
+        }
       });
 
       scene.add(model);
@@ -318,23 +317,29 @@ lenis.on("scroll", ({ scroll, limit }) => {
 (function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })(0);
 
 // ---------- Render döngüsü ----------
-function tick() {
+let _lastTick = 0;
+function tick(now = 0) {
+  requestAnimationFrame(tick);
+  // 30fps cap on mobile
+  if (isMobile && now - _lastTick < 32) return;
+  _lastTick = now;
+
   const elapsed = clock.getElapsedTime();
 
-  // Hover raycast
-  raycaster.setFromCamera(pointer, camera);
-  const hits = raycaster.intersectObjects(distortItems.map(d => d.mesh), false);
-  hoveredZ = hits.length > 0
-    ? (distortItems.find(d => d.mesh === hits[0].object)?.defZ ?? null)
-    : null;
-
-  // Update distortion uniforms per mesh
-  for (const item of distortItems) {
-    item.uniforms.uTime.value = elapsed;
-    const target = item.defZ === hoveredZ ? 1 : 0;
-    const iv = item.uniforms.uIntensity;
-    iv.value += (target - iv.value) * 0.12;
-    if (iv.value < 0.001) iv.value = 0;
+  // Hover raycast + distortion — desktop only
+  if (!isMobile) {
+    raycaster.setFromCamera(pointer, camera);
+    const hits = raycaster.intersectObjects(distortItems.map(d => d.mesh), false);
+    hoveredZ = hits.length > 0
+      ? (distortItems.find(d => d.mesh === hits[0].object)?.defZ ?? null)
+      : null;
+    for (const item of distortItems) {
+      item.uniforms.uTime.value = elapsed;
+      const target = item.defZ === hoveredZ ? 1 : 0;
+      const iv = item.uniforms.uIntensity;
+      iv.value += (target - iv.value) * 0.12;
+      if (iv.value < 0.001) iv.value = 0;
+    }
   }
 
   // Camera spline
@@ -388,8 +393,8 @@ function tick() {
     post.grainVignette.uniforms.uTime.value = elapsed;
   }
 
-  // Animate dust particles
-  animateDust(elapsed);
+  // Animate dust particles — desktop only
+  if (!isMobile) animateDust(elapsed);
 
   // Diamond cursor — model hover state
   if (!isMobile && diamondCursor) {
@@ -397,7 +402,6 @@ function tick() {
   }
 
   post.composer.render();
-  requestAnimationFrame(tick);
 }
 
 // ---------- Resize ----------
@@ -430,7 +434,7 @@ async function boot() {
   });
 
   await loadAllModels();
-  createDustParticles();
+  if (!isMobile) createDustParticles();
 
   // Stop breathing, snap to full opacity, then fade the whole screen out
   breathe.kill();
@@ -463,7 +467,7 @@ async function boot() {
     ease: "power2.out",
   });
 
-  tick();
+  requestAnimationFrame(tick);
 
   // Magnetic CTA — elastic snap-back on leave
   const ctaBtn = document.querySelector(".proj-cta");
