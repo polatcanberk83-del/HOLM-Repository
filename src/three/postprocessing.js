@@ -87,21 +87,28 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
   // 1. Render pass
   composer.addPass(new RenderPass(scene, camera));
 
-  let ssao = null, bloom = null, bokeh = null;
+  let ssao = null, bokeh = null;
 
   if (!isMobile) {
-    // 2. SSAO
+    // 2. SSAO — desktop only
     ssao = new SSAOPass(scene, camera, w, h);
     ssao.kernelRadius  = 8;
     ssao.minDistance   = 0.005;
     ssao.maxDistance   = 0.1;
     composer.addPass(ssao);
+  }
 
-    // 3. Bloom
-    bloom = new UnrealBloomPass(new THREE.Vector2(w, h), 0.25, 0.4, 0.9);
-    composer.addPass(bloom);
+  // 3. Bloom — lighter on mobile
+  const bloom = new UnrealBloomPass(
+    new THREE.Vector2(w, h),
+    isMobile ? 0.18 : 0.25,
+    isMobile ? 0.35 : 0.4,
+    isMobile ? 0.92 : 0.9,
+  );
+  composer.addPass(bloom);
 
-    // 4. Depth of Field (Bokeh)
+  if (!isMobile) {
+    // 4. Bokeh — desktop only
     bokeh = new BokehPass(scene, camera, {
       focus:    4.0,
       aperture: 0.0001,
