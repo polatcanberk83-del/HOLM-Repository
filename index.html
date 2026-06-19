@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HOLM — Between sketch and masterpiece, there's patience</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { background: #08050a; overflow-x: hidden; }
+      body { font-family: 'Fraunces', serif; color: #f0e6d8; }
+
+      #scene-canvas {
+        position: fixed;
+        top: 0; left: 0;
+        width: 100vw; height: 100vh;
+        z-index: 1;
+        display: block;
+        touch-action: pan-y;
+      }
+
+      .scroll-spacer {
+        position: relative;
+        width: 100%;
+        height: 1200vh;
+        z-index: 2;
+        pointer-events: none;
+      }
+
+      /* ── Caption ─────────────────────────────────────────────────── */
+      .caption-layer {
+        position: fixed;
+        bottom: 12vh;
+        left: 0;
+        width: 100%;
+        z-index: 3;
+        display: flex;
+        justify-content: center;
+        pointer-events: none;
+      }
+
+      .caption {
+        font-family: 'Fraunces', serif;
+        font-size: clamp(1.1rem, 2.4vw, 1.8rem);
+        font-weight: 300;
+        font-style: italic;
+        letter-spacing: 0.03em;
+        opacity: 0;
+        text-align: center;
+        max-width: 80vw;
+        transition: opacity 0.6s ease;
+      }
+
+      /* ── Wordmark ─────────────────────────────────────────────────── */
+      .wordmark {
+        position: fixed;
+        top: 5vh;
+        left: 5vw;
+        z-index: 3;
+        font-family: 'Fraunces', serif;
+        font-size: 1rem;
+        letter-spacing: 0.15em;
+        font-weight: 400;
+        opacity: 0.85;
+        display: flex;
+        align-items: center;
+        gap: 0.55em;
+      }
+      .wordmark svg { flex-shrink: 0; }
+
+      #loading-wordmark {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35em;
+      }
+
+      /* ── Scroll hint ─────────────────────────────────────────────── */
+      .scroll-hint {
+        position: fixed;
+        bottom: 4vh;
+        left: 0;
+        width: 100%;
+        text-align: center;
+        z-index: 3;
+        font-size: 0.65rem;
+        letter-spacing: 0.22em;
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        opacity: 0.45;
+        transition: opacity 0.7s ease;
+        pointer-events: none;
+      }
+
+      /* ── Loading ─────────────────────────────────────────────────── */
+      .loading-screen {
+        position: fixed;
+        inset: 0;
+        background: #08050a;
+        z-index: 10;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: opacity 0.9s ease;
+      }
+      .loading-screen.hidden { opacity: 0; pointer-events: none; }
+
+      #loading-wordmark {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-size: 2.5rem;
+        letter-spacing: 0.3em;
+        color: #f0e6d8;
+        opacity: 0.15;
+      }
+
+      /* ── Projection overlay ──────────────────────────────────────── */
+      #projection-overlay {
+        position: fixed;
+        inset: 0;
+        z-index: 4;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+        pointer-events: none;
+        padding-top: 8vh;
+      }
+      #projection-overlay.active { pointer-events: auto; }
+
+      .proj-content {
+        text-align: center;
+        max-width: 520px;
+        padding: 0 1.5rem;
+        position: relative;
+      }
+
+      /* Radial glow behind text — reinforces "you're reading off the light" */
+      .proj-content::before {
+        content: '';
+        position: absolute;
+        inset: -80px -60px;
+        background: radial-gradient(ellipse at center,
+          rgba(110, 150, 230, 0.07) 0%,
+          transparent 70%);
+        pointer-events: none;
+      }
+
+      .proj-line {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-size: clamp(0.85rem, 1.4vw, 1.1rem);
+        line-height: 1.75;
+        letter-spacing: 0.01em;
+        color: rgba(215, 230, 255, 0.82);
+        margin-bottom: 0.6em;
+        opacity: 0;
+        position: relative;
+        z-index: 1;
+      }
+      .proj-line.italic { font-style: italic; }
+
+      /* ── CTA button — Awwwards-level ──────────────────────────────── */
+      .proj-cta {
+        display: inline-block;
+        margin-top: 2.5rem;
+        position: relative;
+        overflow: hidden;
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-size: 0.95rem;
+        letter-spacing: 0.18em;
+        color: rgba(215, 230, 255, 0.8);
+        border: 1px solid rgba(215, 230, 255, 0.25);
+        padding: 20px 52px;
+        text-decoration: none;
+        opacity: 0;
+        cursor: pointer;
+        pointer-events: auto;
+        /* transform is driven by JS magnetic — only border/glow transition here */
+        transition: border-color 0.5s ease, box-shadow 0.5s ease, color 0.4s ease;
+        z-index: 1;
+        will-change: transform;
+      }
+
+      /* Fill sweep left → right on hover */
+      .proj-cta::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(105deg,
+          rgba(200, 220, 255, 0.13) 0%,
+          rgba(180, 205, 255, 0.06) 100%);
+        transform: scaleX(0);
+        transform-origin: left center;
+        transition: transform 0.55s cubic-bezier(0.76, 0, 0.24, 1);
+        z-index: 0;
+      }
+      .proj-cta:hover::before { transform: scaleX(1); }
+
+      /* Text layers — slide roll on hover */
+      .proj-cta-text,
+      .proj-cta-text-hover {
+        display: block;
+        position: relative;
+        z-index: 1;
+        transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
+        will-change: transform;
+      }
+
+      .proj-cta-text-hover {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-style: italic;
+        transform: translateY(115%);
+      }
+
+      .proj-cta:hover .proj-cta-text       { transform: translateY(-115%); }
+      .proj-cta:hover .proj-cta-text-hover  { transform: translateY(0); }
+
+      .proj-cta:hover {
+        color: rgba(230, 242, 255, 1.0);
+        border-color: rgba(210, 228, 255, 0.72);
+        box-shadow:
+          0 0 30px rgba(170, 205, 255, 0.28),
+          0 0 70px rgba(170, 205, 255, 0.10),
+          inset 0 0 20px rgba(180, 210, 255, 0.04);
+      }
+
+      /* ── Diamond Cursor ──────────────────────────────────────────── */
+      #diamond-cursor {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9999;
+        top: -40px; left: -40px;
+        transform: translate(-50%, -50%);
+        transition: transform 0.18s cubic-bezier(0.23, 1, 0.32, 1);
+        will-change: transform, top, left;
+      }
+      #diamond-cursor polygon {
+        transition: stroke 0.2s ease, stroke-width 0.2s ease;
+      }
+      #diamond-cursor.hovering {
+        transform: translate(-50%, -50%) scale(1.4);
+      }
+      #diamond-cursor.hovering polygon {
+        stroke: #e8f0ff;
+        stroke-width: 1.5;
+      }
+      #diamond-cursor.model-hover {
+        transform: translate(-50%, -50%) scale(1.2);
+      }
+
+      #crosshair { display: none; }
+      #free-hint { display: none; }
+
+      /* ── Tablet (768 – 1024px) ──────────────────────────────────── */
+      @media (max-width: 1024px) and (min-width: 768px) {
+        .proj-content { max-width: 420px; }
+        .proj-line { font-size: clamp(0.82rem, 1.2vw, 0.98rem); }
+        .proj-cta { padding: 18px 40px; }
+      }
+
+      /* ── Mobile (≤767px) ─────────────────────────────────────────── */
+      @media (max-width: 767px) {
+        /* Loading */
+        #loading-wordmark {
+          font-size: 1.8rem;
+          letter-spacing: 0.2em;
+          gap: 0.3em;
+        }
+        #loading-wordmark svg { width: 18px; height: 18px; }
+
+        /* Caption */
+        .caption-layer { bottom: 10vh; }
+        .caption {
+          font-size: clamp(0.85rem, 4.5vw, 1.2rem);
+          max-width: 88vw;
+          letter-spacing: 0.02em;
+        }
+
+        /* Wordmark */
+        .wordmark {
+          font-size: 0.85rem;
+          top: 4vh;
+          left: 4vw;
+          gap: 0.45em;
+        }
+        .wordmark svg { width: 9px; height: 9px; }
+
+        /* Scroll hint */
+        .scroll-hint {
+          font-size: 0.55rem;
+          letter-spacing: 0.18em;
+          bottom: 3.5vh;
+        }
+
+        /* Projection overlay — reset desktop top-padding, side padding */
+        #projection-overlay {
+          padding-top: 0;
+          padding-bottom: 0;
+          padding-left: 1.8rem;
+          padding-right: 1.8rem;
+        }
+        .proj-content {
+          max-width: 100%;
+          padding: 0;
+        }
+        /* Suppress manual line breaks — let text rewrap naturally */
+        .proj-line br { display: none; }
+        .proj-line {
+          font-size: clamp(0.82rem, 4vw, 1rem);
+          line-height: 1.72;
+          margin-bottom: 0.75em;
+        }
+        .proj-cta {
+          display: block;
+          width: 100%;
+          text-align: center;
+          padding: 16px 24px;
+          font-size: 0.85rem;
+          margin-top: 1.8rem;
+        }
+        .proj-cta-text-hover { display: none; }
+        #diamond-cursor { display: none; }
+      }
+
+      /* ── Small phones (≤375px) ───────────────────────────────────── */
+      @media (max-width: 375px) {
+        #loading-wordmark { font-size: 1.5rem; }
+        .caption { font-size: clamp(0.78rem, 4.2vw, 0.95rem); }
+        .proj-line { font-size: clamp(0.76rem, 3.8vw, 0.9rem); }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-BaU-j3cZ.js"></script>
+  </head>
+  <body>
+    <div class="loading-screen" id="loading">
+      <span id="loading-wordmark">
+        HOLM
+        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <polygon points="10,1 19,10 10,19 1,10" stroke="currentColor" stroke-width="1" fill="none"/>
+        </svg>
+      </span>
+    </div>
+
+    <canvas id="scene-canvas"></canvas>
+
+    <div class="wordmark">
+      HOLM
+      <svg width="10" height="10" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="10,1 19,10 10,19 1,10" stroke="currentColor" stroke-width="1.2" fill="none"/>
+      </svg>
+    </div>
+
+    <div class="caption-layer">
+      <div class="caption" id="caption"></div>
+    </div>
+
+    <div class="scroll-hint" id="scroll-hint">SCROLL TO EXPLORE</div>
+
+    <!-- Projection section overlay -->
+    <div id="projection-overlay">
+      <div class="proj-content">
+        <p class="proj-line">Every brand gets one moment to be remembered.</p>
+        <p class="proj-line">Most spend it blending in.</p>
+        <p class="proj-line">We don't build websites — we build the moment your brand<br>is met, felt, and not forgotten.</p>
+        <p class="proj-line">The kind people screenshot. The kind that earns attention<br>instead of buying it.</p>
+        <p class="proj-line italic">When you're ready for yours —</p>
+      </div>
+      <a class="proj-cta"
+         href="https://cal.com/canberk-polat-dpsl0y/discovery-call"
+         target="_blank"
+         rel="noopener noreferrer">
+        <span class="proj-cta-text">Let's make the moment</span>
+        <span class="proj-cta-text-hover">Book a call →</span>
+      </a>
+    </div>
+
+    <div id="diamond-cursor">
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <polygon points="10,1 19,10 10,19 1,10" stroke="#c8d8ff" stroke-width="1" fill="none"/>
+      </svg>
+    </div>
+    <div id="crosshair"></div>
+
+    <div class="scroll-spacer"></div>
+
+  </body>
+</html>
