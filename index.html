@@ -278,6 +278,38 @@
       #crosshair { display: none; }
       #free-hint { display: none; }
 
+      /* ── Book a Call button ─────────────────────────────────────── */
+      #book-call {
+        position: fixed;
+        top: 5vh;
+        right: 5vw;
+        z-index: 3;
+        font-family: 'Fraunces', serif;
+        font-size: 0.72rem;
+        font-weight: 300;
+        letter-spacing: 0.16em;
+        color: rgba(215, 230, 255, 0.8);
+        border: 1px solid rgba(215, 230, 255, 0.22);
+        padding: 9px 20px;
+        text-decoration: none;
+        pointer-events: auto;
+        transition: color 0.35s ease, border-color 0.35s ease, box-shadow 0.35s ease;
+        white-space: nowrap;
+      }
+      #book-call:hover {
+        color: rgba(230, 242, 255, 1.0);
+        border-color: rgba(210, 228, 255, 0.65);
+        box-shadow: 0 0 20px rgba(170, 205, 255, 0.18);
+      }
+      @media (max-width: 767px) {
+        #book-call {
+          font-size: 0.6rem;
+          padding: 7px 14px;
+          letter-spacing: 0.12em;
+          top: calc(5vh - 2px);
+        }
+      }
+
       /* ── Tablet (768 – 1024px) ──────────────────────────────────── */
       @media (max-width: 1024px) and (min-width: 768px) {
         .proj-content { max-width: 420px; }
@@ -376,6 +408,13 @@
         <polygon points="10,1 19,10 10,19 1,10" stroke="currentColor" stroke-width="1.2" fill="none"/>
       </svg>
     </div>
+
+    <a id="book-call"
+       href="https://cal.com/canberk-polat-dpsl0y/discovery-call"
+       target="_blank"
+       rel="noopener noreferrer">
+      Book a Call
+    </a>
 
     <div class="caption-layer">
       <div class="caption" id="caption"></div>
