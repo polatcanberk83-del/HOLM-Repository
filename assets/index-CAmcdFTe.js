@@ -4611,7 +4611,7 @@ void main() {
 			gl_FragColor = col / 41.0;
 			gl_FragColor.a = 1.0;
 
-		}`},dg=class extends Jh{constructor(e,t,n){super(),this.scene=e,this.camera=t;let r=n.focus===void 0?1:n.focus,i=n.aperture===void 0?.025:n.aperture,a=n.maxblur===void 0?1:n.maxblur;this._renderTargetDepth=new un(1,1,{minFilter:y,magFilter:y,type:M}),this._renderTargetDepth.texture.name=`BokehPass.depth`,this._materialDepth=new Ga,this._materialDepth.depthPacking=Qe,this._materialDepth.blending=0;let o=La.clone(ug.uniforms);o.tDepth.value=this._renderTargetDepth.texture,o.focus.value=r,o.aspect.value=t.aspect,o.aperture.value=i,o.maxblur.value=a,o.nearClip.value=t.near,o.farClip.value=t.far,this.materialBokeh=new Ba({defines:Object.assign({},ug.defines),uniforms:o,vertexShader:ug.vertexShader,fragmentShader:ug.fragmentShader}),this.uniforms=o,this._fsQuad=new Zh(this.materialBokeh),this._oldClearColor=new Y}render(e,t,n){this.scene.overrideMaterial=this._materialDepth,e.getClearColor(this._oldClearColor);let r=e.getClearAlpha(),i=e.autoClear;e.autoClear=!1,e.setClearColor(16777215),e.setClearAlpha(1),e.setRenderTarget(this._renderTargetDepth),e.clear(),e.render(this.scene,this.camera),this.uniforms.tColor.value=n.texture,this.uniforms.nearClip.value=this.camera.near,this.uniforms.farClip.value=this.camera.far,this.renderToScreen?(e.setRenderTarget(null),this._fsQuad.render(e)):(e.setRenderTarget(t),e.clear(),this._fsQuad.render(e)),this.scene.overrideMaterial=null,e.setClearColor(this._oldClearColor),e.setClearAlpha(r),e.autoClear=i}setSize(e,t){this.materialBokeh.uniforms.aspect.value=e/t,this._renderTargetDepth.setSize(e,t)}dispose(){this._renderTargetDepth.dispose(),this._materialDepth.dispose(),this.materialBokeh.dispose(),this._fsQuad.dispose()}},fg={uniforms:{tDiffuse:{value:null},uTime:{value:0},uMouseUV:{value:new W(.5,.5)},uMouseVel:{value:0}},vertexShader:`
+		}`},dg=class extends Jh{constructor(e,t,n){super(),this.scene=e,this.camera=t;let r=n.focus===void 0?1:n.focus,i=n.aperture===void 0?.025:n.aperture,a=n.maxblur===void 0?1:n.maxblur;this._renderTargetDepth=new un(1,1,{minFilter:y,magFilter:y,type:M}),this._renderTargetDepth.texture.name=`BokehPass.depth`,this._materialDepth=new Ga,this._materialDepth.depthPacking=Qe,this._materialDepth.blending=0;let o=La.clone(ug.uniforms);o.tDepth.value=this._renderTargetDepth.texture,o.focus.value=r,o.aspect.value=t.aspect,o.aperture.value=i,o.maxblur.value=a,o.nearClip.value=t.near,o.farClip.value=t.far,this.materialBokeh=new Ba({defines:Object.assign({},ug.defines),uniforms:o,vertexShader:ug.vertexShader,fragmentShader:ug.fragmentShader}),this.uniforms=o,this._fsQuad=new Zh(this.materialBokeh),this._oldClearColor=new Y}render(e,t,n){this.scene.overrideMaterial=this._materialDepth,e.getClearColor(this._oldClearColor);let r=e.getClearAlpha(),i=e.autoClear;e.autoClear=!1,e.setClearColor(16777215),e.setClearAlpha(1),e.setRenderTarget(this._renderTargetDepth),e.clear(),e.render(this.scene,this.camera),this.uniforms.tColor.value=n.texture,this.uniforms.nearClip.value=this.camera.near,this.uniforms.farClip.value=this.camera.far,this.renderToScreen?(e.setRenderTarget(null),this._fsQuad.render(e)):(e.setRenderTarget(t),e.clear(),this._fsQuad.render(e)),this.scene.overrideMaterial=null,e.setClearColor(this._oldClearColor),e.setClearAlpha(r),e.autoClear=i}setSize(e,t){this.materialBokeh.uniforms.aspect.value=e/t,this._renderTargetDepth.setSize(e,t)}dispose(){this._renderTargetDepth.dispose(),this._materialDepth.dispose(),this.materialBokeh.dispose(),this._fsQuad.dispose()}},fg={uniforms:{tDiffuse:{value:null},uTime:{value:0}},vertexShader:`
     varying vec2 vUv;
     void main() {
       vUv = uv;
@@ -4620,8 +4620,6 @@ void main() {
   `,fragmentShader:`
     uniform sampler2D tDiffuse;
     uniform float     uTime;
-    uniform vec2      uMouseUV;
-    uniform float     uMouseVel;
     varying vec2      vUv;
 
     float hash21(vec2 p) {
@@ -4659,25 +4657,17 @@ void main() {
     }
 
     void main() {
-      // Layer A — ambient: drifting noise, always visible even with no mouse input
-      vec2 scroll   = vec2(uTime * 0.12, uTime * 0.08);
-      vec2 ambWarp  = fbm2(vUv * 1.8 + scroll) * 0.032;
+      // Ambient only — slow drifting noise warp, no cursor interaction
+      vec2 scroll  = vec2(uTime * 0.12, uTime * 0.08);
+      vec2 warp    = fbm2(vUv * 1.8 + scroll) * 0.014;
 
-      // Layer B — cursor zone: gentle amplify + small radial push
-      vec2  delta   = vUv - uMouseUV;
-      float distSq  = dot(delta, delta);
-      float zone    = exp(-distSq * 4.0);
-
-      vec2  warp    = ambWarp * (1.0 + uMouseVel * 3.5 * zone)
-                    + normalize(delta + vec2(1e-5)) * uMouseVel * 0.012 * zone;
-
-      // Fade near edges so UV wrapping doesn't show
+      // Fade near edges
       vec2 ef  = smoothstep(0.0, 0.07, vUv) * smoothstep(1.0, 0.93, vUv);
       warp    *= ef.x * ef.y;
 
       gl_FragColor = texture2D(tDiffuse, clamp(vUv + warp, 0.001, 0.999));
     }
-  `};function pg(){let e=new Qh(fg);function t(t,n,r,i){e.uniforms.uTime.value=i,e.uniforms.uMouseUV.value.set(t,1-n),e.uniforms.uMouseVel.value=r}return{pass:e,update:t}}var mg={uniforms:{tDiffuse:{value:null},amount:{value:.01}},vertexShader:`
+  `};function pg(){let e=new Qh(fg);function t(t,n,r,i){e.uniforms.uTime.value=i}return{pass:e,update:t}}var mg={uniforms:{tDiffuse:{value:null},amount:{value:.01}},vertexShader:`
     varying vec2 vUv;
     void main() {
       vUv = uv;
