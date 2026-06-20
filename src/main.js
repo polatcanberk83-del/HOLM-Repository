@@ -419,7 +419,7 @@ function tick(now = 0) {
 
   // Liquid ripple update — decay velocity each frame then push to shader
   if (post.rippleUpdate) {
-    _mouseVel *= 0.93;
+    _mouseVel *= 0.88;
     post.rippleUpdate(_mouseNX, _mouseNY, _mouseVel, elapsed);
   }
 

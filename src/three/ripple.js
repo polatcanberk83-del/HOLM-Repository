@@ -57,17 +57,17 @@ const LiquidDistortShader = {
     }
 
     void main() {
-      // Layer A — ambient: slow drifting noise warp, always visible
-      vec2 scroll    = vec2(uTime * 0.07, uTime * 0.05);
-      vec2 ambWarp   = fbm2(vUv * 3.0 + scroll) * 0.022;
+      // Layer A — ambient: drifting noise, always visible even with no mouse input
+      vec2 scroll   = vec2(uTime * 0.12, uTime * 0.08);
+      vec2 ambWarp  = fbm2(vUv * 1.8 + scroll) * 0.032;
 
-      // Layer B — cursor zone: amplify + radial push on mouse movement
-      vec2  delta    = vUv - uMouseUV;
-      float distSq   = dot(delta, delta);
-      float zone     = exp(-distSq * 3.5);
+      // Layer B — cursor zone: gentle amplify + small radial push
+      vec2  delta   = vUv - uMouseUV;
+      float distSq  = dot(delta, delta);
+      float zone    = exp(-distSq * 4.0);
 
-      vec2  warp     = ambWarp * (1.0 + uMouseVel * 15.0 * zone)
-                     + normalize(delta + vec2(1e-5)) * uMouseVel * 0.04 * zone;
+      vec2  warp    = ambWarp * (1.0 + uMouseVel * 3.5 * zone)
+                    + normalize(delta + vec2(1e-5)) * uMouseVel * 0.012 * zone;
 
       // Fade near edges so UV wrapping doesn't show
       vec2 ef  = smoothstep(0.0, 0.07, vUv) * smoothstep(1.0, 0.93, vUv);
