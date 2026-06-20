@@ -6,7 +6,7 @@ export function createScene(canvas, isMobile = false) {
   renderer.setPixelRatio(Math.min(window.devicePixelRatio, isMobile ? 1.0 : 2));
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.toneMapping        = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = isMobile ? 7.5 : 6.5;
+  renderer.toneMappingExposure = 6.5;
   renderer.shadowMap.enabled  = !isMobile;
   renderer.shadowMap.type     = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace   = THREE.SRGBColorSpace;
@@ -57,10 +57,10 @@ export function createScene(canvas, isMobile = false) {
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, isMobile ? 38.0 : 32.0);
+  const ambient = new THREE.AmbientLight(0x203050, 32.0);
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, isMobile ? 30.0 : 26.0);
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 26.0);
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
@@ -77,7 +77,7 @@ export function createScene(canvas, isMobile = false) {
   // Fill lights on left/right walls so they light the room without blasting models from above
   (isMobile ? [0, -24, -48] : [0, -12, -24, -36, -48]).forEach(z => {
     [-8, 8].forEach(x => {
-      const fill = new THREE.PointLight(0x3a5080, isMobile ? 5500 : 4000, 28, 2);
+      const fill = new THREE.PointLight(0x3a5080, 4000, 28, 2);
       fill.position.set(x, 4, z);
       scene.add(fill);
     });
