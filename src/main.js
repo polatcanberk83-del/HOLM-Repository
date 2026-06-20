@@ -9,10 +9,10 @@ import { loadModel }            from "./three/loader.js";
 // ---------- Model tanımları ----------
 const MODEL_CAPTIONS = {
   "hand.glb":        "Every brand begins like this.",
-  "monument.glb":    "Some things stay unfinished.",
+  "monument.glb":    "Something is always missing at the beginning.",
   "hero_canvas.glb": "Between sketch and masterpiece, there's patience.",
   "void_figure.glb": "What's left unsaid shapes the rest.",
-  "arm_crystal.glb": "This is the moment brands are remembered for.",
+  "arm_crystal.glb": "What was lost, is held at the end.",
 };
 function captionFor(filename) { return MODEL_CAPTIONS[filename] ?? ""; }
 
@@ -38,13 +38,20 @@ const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isM
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 
-// ---------- Custom cursor ----------
+// ---------- Custom cursor + normalized mouse for ripple ----------
+let _mouseNX = 0.5, _mouseNY = 0.5, _mouseVel = 0;
 if (!isMobile && diamondCursor) {
   canvas.style.cursor = "none";
   document.body.style.cursor = "none";
   window.addEventListener("mousemove", e => {
     diamondCursor.style.left = e.clientX + "px";
     diamondCursor.style.top  = e.clientY + "px";
+    const nx = e.clientX / window.innerWidth;
+    const ny = e.clientY / window.innerHeight;
+    const dx = nx - _mouseNX, dy = ny - _mouseNY;
+    _mouseVel = Math.min(_mouseVel + Math.sqrt(dx * dx + dy * dy) * 20, 1.0);
+    _mouseNX = nx;
+    _mouseNY = ny;
   });
 }
 
@@ -408,6 +415,12 @@ function tick(now = 0) {
   // Diamond cursor — model hover state
   if (!isMobile && diamondCursor) {
     diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
+  }
+
+  // Liquid ripple update — decay velocity each frame then push to shader
+  if (post.rippleUpdate) {
+    _mouseVel *= 0.93;
+    post.rippleUpdate(_mouseNX, _mouseNY, _mouseVel, elapsed);
   }
 
   post.composer.render();
