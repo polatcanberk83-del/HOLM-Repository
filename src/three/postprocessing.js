@@ -118,21 +118,30 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     composer.addPass(bokeh);
   }
 
-  // 5. Liquid cursor distortion — desktop only, before chroma so aberration frames the ripple
+  // 5. Liquid cloth distortion — desktop only
   let rippleEffect = null;
   if (!isMobile) {
     rippleEffect = createRippleEffect();
     composer.addPass(rippleEffect.pass);
   }
 
-  // 6. Chromatic aberration
-  const chroma = new ShaderPass(ChromaShader);
-  composer.addPass(chroma);
+  // 6. Chromatic aberration — desktop only
+  let chroma = null;
+  if (!isMobile) {
+    chroma = new ShaderPass(ChromaShader);
+    composer.addPass(chroma);
+  }
 
-  // 7. Film grain + vignette — LAST pass
-  const grainVignette = new ShaderPass(GrainVignetteShader);
-  grainVignette.renderToScreen = true;
-  composer.addPass(grainVignette);
+  // 7. Film grain + vignette — desktop only, LAST pass
+  let grainVignette = null;
+  if (!isMobile) {
+    grainVignette = new ShaderPass(GrainVignetteShader);
+    grainVignette.renderToScreen = true;
+    composer.addPass(grainVignette);
+  } else {
+    // On mobile, bloom is the last pass — mark it to render to screen
+    bloom.renderToScreen = true;
+  }
 
   return {
     composer,

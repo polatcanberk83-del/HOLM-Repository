@@ -87,7 +87,7 @@ if (!isMobile && diamondCursor) {
 // ---------- Orbit sabitleri ----------
 const CAM_H   = 1.8;
 const ORBIT_R = isMobile ? 5 : 4;
-const ORBIT_N = 32;
+const ORBIT_N = isMobile ? 16 : 32;
 
 // ---------- Kamera yolu ----------
 function buildPath() {
