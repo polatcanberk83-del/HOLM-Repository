@@ -335,8 +335,8 @@ function hideProjection() {
 if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
 const lenis = new Lenis(isMobile ? {
   smoothTouch:     true,
-  touchMultiplier: 0.06,
-  lerp:            0.012,
+  touchMultiplier: 0.09,
+  lerp:            0.05,
   smoothWheel:     true,
   wheelMultiplier: 0.28,
 } : {
@@ -360,8 +360,6 @@ lenis.on("scroll", ({ scroll, limit }) => {
 let _lastTick = 0;
 function tick(now = 0) {
   requestAnimationFrame(tick);
-  // 30fps cap on mobile
-  if (isMobile && now - _lastTick < 32) return;
   _lastTick = now;
 
   const elapsed = clock.getElapsedTime();
