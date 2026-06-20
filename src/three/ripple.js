@@ -3,10 +3,8 @@ import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass.js";
 
 const LiquidDistortShader = {
   uniforms: {
-    tDiffuse:  { value: null },
-    uTime:     { value: 0.0 },
-    uMouseUV:  { value: new THREE.Vector2(0.5, 0.5) },
-    uMouseVel: { value: 0.0 },
+    tDiffuse: { value: null },
+    uTime:    { value: 0.0 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -18,8 +16,6 @@ const LiquidDistortShader = {
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float     uTime;
-    uniform vec2      uMouseUV;
-    uniform float     uMouseVel;
     varying vec2      vUv;
 
     float hash21(vec2 p) {
@@ -57,19 +53,11 @@ const LiquidDistortShader = {
     }
 
     void main() {
-      // Layer A — ambient: drifting noise, always visible even with no mouse input
-      vec2 scroll   = vec2(uTime * 0.12, uTime * 0.08);
-      vec2 ambWarp  = fbm2(vUv * 1.8 + scroll) * 0.032;
+      // Ambient only — slow drifting noise warp, no cursor interaction
+      vec2 scroll  = vec2(uTime * 0.12, uTime * 0.08);
+      vec2 warp    = fbm2(vUv * 1.8 + scroll) * 0.014;
 
-      // Layer B — cursor zone: gentle amplify + small radial push
-      vec2  delta   = vUv - uMouseUV;
-      float distSq  = dot(delta, delta);
-      float zone    = exp(-distSq * 4.0);
-
-      vec2  warp    = ambWarp * (1.0 + uMouseVel * 3.5 * zone)
-                    + normalize(delta + vec2(1e-5)) * uMouseVel * 0.012 * zone;
-
-      // Fade near edges so UV wrapping doesn't show
+      // Fade near edges
       vec2 ef  = smoothstep(0.0, 0.07, vUv) * smoothstep(1.0, 0.93, vUv);
       warp    *= ef.x * ef.y;
 
@@ -82,9 +70,7 @@ export function createRippleEffect() {
   const pass = new ShaderPass(LiquidDistortShader);
 
   function update(nx, ny, vel, time) {
-    pass.uniforms.uTime.value     = time;
-    pass.uniforms.uMouseUV.value.set(nx, 1.0 - ny);
-    pass.uniforms.uMouseVel.value = vel;
+    pass.uniforms.uTime.value = time;
   }
 
   return { pass, update };
