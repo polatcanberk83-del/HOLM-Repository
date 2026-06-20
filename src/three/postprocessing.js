@@ -39,8 +39,9 @@ const ChromaShader = {
 // ---------- Film Grain + Vignette (single pass, last in chain) ----------
 const GrainVignetteShader = {
   uniforms: {
-    tDiffuse: { value: null },
-    uTime:    { value: 0.0 },
+    tDiffuse:  { value: null },
+    uTime:     { value: 0.0 },
+    uGrainAmp: { value: 0.04 },
   },
   vertexShader: /* glsl */`
     varying vec2 vUv;
@@ -52,6 +53,7 @@ const GrainVignetteShader = {
   fragmentShader: /* glsl */`
     uniform sampler2D tDiffuse;
     uniform float uTime;
+    uniform float uGrainAmp;
     varying vec2 vUv;
 
     float filmGrain(vec2 uv, float t) {
@@ -62,17 +64,14 @@ const GrainVignetteShader = {
     void main() {
       vec4 color = texture2D(tDiffuse, vUv);
 
-      // Film grain — very subtle
-      float grain = filmGrain(vUv, uTime) * 0.04;
-      color.rgb += grain;
+      // Film grain — skipped on mobile (uGrainAmp = 0)
+      color.rgb += filmGrain(vUv, uTime) * uGrainAmp;
 
       // Vignette — smooth darkening toward edges
-      vec2 vig = (vUv - 0.5) * 2.0;
-      float vigRadius   = 0.75;
-      float vigSoftness = 0.45;
-      float vigDist = length(vig);
-      float vignette = 1.0 - smoothstep(vigRadius - vigSoftness, vigRadius + vigSoftness, vigDist);
-      color.rgb *= vignette;
+      vec2  vig         = (vUv - 0.5) * 2.0;
+      float vigDist     = length(vig);
+      float vignette    = 1.0 - smoothstep(0.3, 1.2, vigDist);
+      color.rgb        *= vignette;
 
       gl_FragColor = color;
     }
@@ -132,16 +131,11 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     composer.addPass(chroma);
   }
 
-  // 7. Film grain + vignette — desktop only, LAST pass
-  let grainVignette = null;
-  if (!isMobile) {
-    grainVignette = new ShaderPass(GrainVignetteShader);
-    grainVignette.renderToScreen = true;
-    composer.addPass(grainVignette);
-  } else {
-    // On mobile, bloom is the last pass — mark it to render to screen
-    bloom.renderToScreen = true;
-  }
+  // 7. Film grain + vignette — always last pass (mobile: grain disabled, vignette only)
+  const grainVignette = new ShaderPass(GrainVignetteShader);
+  if (isMobile) grainVignette.uniforms.uGrainAmp.value = 0;
+  grainVignette.renderToScreen = true;
+  composer.addPass(grainVignette);
 
   return {
     composer,
