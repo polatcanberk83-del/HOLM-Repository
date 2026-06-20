@@ -38,20 +38,16 @@ const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isM
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 
-// ---------- Custom cursor + normalized mouse for ripple ----------
-let _mouseNX = 0.5, _mouseNY = 0.5, _mouseVel = 0;
+// ---------- Custom cursor ----------
+let _mouseNX = 0.5, _mouseNY = 0.5;
 if (!isMobile && diamondCursor) {
   canvas.style.cursor = "none";
   document.body.style.cursor = "none";
   window.addEventListener("mousemove", e => {
     diamondCursor.style.left = e.clientX + "px";
     diamondCursor.style.top  = e.clientY + "px";
-    const nx = e.clientX / window.innerWidth;
-    const ny = e.clientY / window.innerHeight;
-    const dx = nx - _mouseNX, dy = ny - _mouseNY;
-    _mouseVel = Math.min(_mouseVel + Math.sqrt(dx * dx + dy * dy) * 20, 1.0);
-    _mouseNX = nx;
-    _mouseNY = ny;
+    _mouseNX = e.clientX / window.innerWidth;
+    _mouseNY = e.clientY / window.innerHeight;
   });
 }
 
@@ -417,10 +413,10 @@ function tick(now = 0) {
     diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
   }
 
-  // Liquid ripple update — decay velocity each frame then push to shader
+  // Cloth wind distortion — naturalistic gusting (same formula as original cloth shader)
   if (post.rippleUpdate) {
-    _mouseVel *= 0.88;
-    post.rippleUpdate(_mouseNX, _mouseNY, _mouseVel, elapsed);
+    const gust = Math.max(0.0, (Math.sin(elapsed * 0.7) + Math.sin(elapsed * 2.3) * 0.5) + 0.5);
+    post.rippleUpdate(elapsed, 0.35 + gust * 0.2);
   }
 
   post.composer.render();
