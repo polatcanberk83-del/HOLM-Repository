@@ -237,6 +237,20 @@
           inset 0 0 20px rgba(180, 210, 255, 0.04);
       }
 
+      /* ── Cursor glow trail ───────────────────────────────────────── */
+      .cursor-trail {
+        position: fixed;
+        pointer-events: none;
+        z-index: 9998;
+        width: 5px;
+        height: 5px;
+        border-radius: 50%;
+        background: rgba(180, 210, 255, 0.9);
+        box-shadow: 0 0 8px 3px rgba(140, 180, 255, 0.45);
+        transform: translate(-50%, -50%) scale(1);
+        will-change: opacity, transform;
+      }
+
       /* ── Diamond Cursor ──────────────────────────────────────────── */
       #diamond-cursor {
         position: fixed;

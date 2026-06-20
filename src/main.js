@@ -12,7 +12,7 @@ const MODEL_CAPTIONS = {
   "monument.glb":    "Something is always missing at the beginning.",
   "hero_canvas.glb": "Between sketch and masterpiece, there's patience.",
   "void_figure.glb": "What's left unsaid shapes the rest.",
-  "arm_crystal.glb": "What was lost, is held at the end.",
+  "arm_crystal.glb": "What was missing is held at the end.",
 };
 function captionFor(filename) { return MODEL_CAPTIONS[filename] ?? ""; }
 
@@ -38,8 +38,24 @@ const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isM
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 
-// ---------- Custom cursor ----------
+// ---------- Custom cursor + glow trail ----------
 let _mouseNX = 0.5, _mouseNY = 0.5;
+
+const TRAIL_COUNT = 14;
+const _trailEls   = [];
+let   _trailIdx   = 0;
+let   _lastTrailMs = 0;
+
+if (!isMobile) {
+  for (let i = 0; i < TRAIL_COUNT; i++) {
+    const el = document.createElement("div");
+    el.className = "cursor-trail";
+    el.style.opacity = "0";
+    document.body.appendChild(el);
+    _trailEls.push(el);
+  }
+}
+
 if (!isMobile && diamondCursor) {
   canvas.style.cursor = "none";
   document.body.style.cursor = "none";
@@ -48,6 +64,23 @@ if (!isMobile && diamondCursor) {
     diamondCursor.style.top  = e.clientY + "px";
     _mouseNX = e.clientX / window.innerWidth;
     _mouseNY = e.clientY / window.innerHeight;
+
+    // Spawn trail dot every ~28ms
+    const now = performance.now();
+    if (now - _lastTrailMs > 28) {
+      _lastTrailMs = now;
+      const el = _trailEls[_trailIdx % TRAIL_COUNT];
+      _trailIdx++;
+      el.style.transition = "none";
+      el.style.left    = e.clientX + "px";
+      el.style.top     = e.clientY + "px";
+      el.style.opacity = "0.8";
+      el.style.transform = "translate(-50%, -50%) scale(1)";
+      el.offsetHeight; // force reflow so transition fires
+      el.style.transition = "opacity 0.55s ease-out, transform 0.55s ease-out";
+      el.style.opacity   = "0";
+      el.style.transform = "translate(-50%, -50%) scale(0.1)";
+    }
   });
 }
 
