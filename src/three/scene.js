@@ -57,10 +57,10 @@ export function createScene(canvas, isMobile = false) {
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, 18.0);
+  const ambient = new THREE.AmbientLight(0x203050, 32.0);
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 14.0);
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 26.0);
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
