@@ -334,12 +334,10 @@ function hideProjection() {
 // ---------- Lenis ----------
 if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
 const lenis = new Lenis(isMobile ? {
-  // syncTouch: finger-tracking 1:1 during drag, momentum on release — no JS lerp latency
-  syncTouch:      true,
-  syncTouchLerp:  0.075,
+  // smoothTouch: false — let native iOS/Android momentum handle touch
+  // Lenis still fires scroll events so splineT stays in sync
+  smoothTouch:     false,
   touchMultiplier: 1.0,
-  smoothWheel:    true,
-  wheelMultiplier: 0.28,
 } : {
   duration:        4.0,
   smoothWheel:     true,
@@ -389,12 +387,7 @@ function tick(now = 0) {
 
   // Camera spline
   _camTarget.copy(camPath.getPoint(splineT));
-  // Mobile: snap to spline — no lerp shortcutting through models on fast scroll
-  if (isMobile) {
-    camera.position.copy(_camTarget);
-  } else {
-    camera.position.lerp(_camTarget, 0.07);
-  }
+  camera.position.lerp(_camTarget, isMobile ? 0.18 : 0.07);
 
   const { def: near, dist } = findNearest(camera.position);
   const inOrbit      = near && dist < ORBIT_R + 1.5;
