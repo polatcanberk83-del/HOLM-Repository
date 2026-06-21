@@ -124,7 +124,8 @@ function buildPath() {
 const camPath = buildPath();
 
 // ---------- Scroll → spline ----------
-let splineT = 0;
+let splineT       = 0; // target T (from scroll)
+let splineTSmooth = 0; // smoothed T (drives camera on mobile — stays ON the path)
 
 const _camTarget  = new THREE.Vector3();
 const _lookTarget = new THREE.Vector3(0, 1.5, 0);
@@ -386,8 +387,16 @@ function tick(now = 0) {
   }
 
   // Camera spline
-  _camTarget.copy(camPath.getPoint(splineT));
-  camera.position.lerp(_camTarget, isMobile ? 0.18 : 0.07);
+  // Mobile: lerp T itself so camera stays on the curve — no straight-line shortcuts through models
+  // Desktop: lerp 3D position for the gentle float effect
+  if (isMobile) {
+    splineTSmooth += (splineT - splineTSmooth) * 0.14;
+    _camTarget.copy(camPath.getPoint(splineTSmooth));
+    camera.position.copy(_camTarget);
+  } else {
+    _camTarget.copy(camPath.getPoint(splineT));
+    camera.position.lerp(_camTarget, 0.07);
+  }
 
   const { def: near, dist } = findNearest(camera.position);
   const inOrbit      = near && dist < ORBIT_R + 1.5;
