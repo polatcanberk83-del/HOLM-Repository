@@ -391,7 +391,7 @@ function tick(now = 0) {
   // Mobile: lerp T itself so camera stays on the curve — no straight-line shortcuts through models
   // Desktop: lerp 3D position for the gentle float effect
   if (isMobile) {
-    splineTSmooth += (splineT - splineTSmooth) * 0.14;
+    splineTSmooth += (splineT - splineTSmooth) * 0.16;
     _camTarget.copy(camPath.getPoint(splineTSmooth));
     camera.position.copy(_camTarget);
   } else {
@@ -482,24 +482,29 @@ async function boot() {
   // Hide wordmark initially for intro animation
   if (wordmarkEl) wordmarkEl.style.opacity = "0";
 
-  // Breathing loop on loading wordmark while assets load
-  const loadingWordmark = document.getElementById("loading-wordmark");
-  const breathe = gsap.to(loadingWordmark, {
-    opacity: 0.9,
-    duration: 2.2,
-    ease: "sine.inOut",
-    yoyo: true,
-    repeat: -1,
+  // ---------- SVG draw animation ----------
+  const drawPaths = Array.from(document.querySelectorAll("#holm-draw .dp"));
+  drawPaths.forEach(p => {
+    const len = p.getTotalLength();
+    gsap.set(p, { strokeDasharray: len, strokeDashoffset: len });
+  });
+  // Draw each letter sequentially with a tiny overlap
+  const drawTl = gsap.timeline();
+  drawPaths.forEach((p, i) => {
+    drawTl.to(p, { strokeDashoffset: 0, duration: 0.45, ease: "power2.inOut" }, i === 0 ? 0 : "-=0.05");
   });
 
-  await loadAllModels();
+  // Load models concurrently with draw animation
+  const modelsPromise = loadAllModels();
+
+  // Wait for drawing to complete first (keeps pacing to ~2s total)
+  await drawTl;
+  // Then ensure models are ready (usually done by now on fast connections)
+  await modelsPromise;
   if (!isMobile) createDustParticles();
 
-  // Stop breathing, snap to full opacity, then fade the whole screen out
-  breathe.kill();
-  await gsap.to(loadingWordmark, { opacity: 1, duration: 0.4, ease: "power2.out" });
-  // Extra wait on mobile — lets GPU finish compiling shaders before showing scene
-  await new Promise(r => setTimeout(r, isMobile ? 2000 : 300));
+  // Brief buffer for GPU shader compilation
+  await new Promise(r => setTimeout(r, 300));
   loadingEl.classList.add("hidden");
 
   // Intro animation: ease camera forward into scene

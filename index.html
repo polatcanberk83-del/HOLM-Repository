@@ -11,7 +11,11 @@
 
     <style>
       * { margin: 0; padding: 0; box-sizing: border-box; }
-      html, body { background: #08050a; overflow-x: hidden; }
+      html, body {
+        background: #08050a;
+        overflow-x: hidden;
+        overscroll-behavior-y: none; /* prevent iOS bounce from creating scroll jumps */
+      }
       body { font-family: 'Fraunces', serif; color: #f0e6d8; }
 
       #scene-canvas {
@@ -111,14 +115,13 @@
       }
       .loading-screen.hidden { opacity: 0; pointer-events: none; }
 
-      #loading-wordmark {
-        font-family: 'Fraunces', serif;
-        font-weight: 300;
-        font-size: 2.5rem;
-        letter-spacing: 0.3em;
-        color: #f0e6d8;
-        opacity: 0.15;
+      /* SVG draw logo */
+      #holm-draw {
+        width: clamp(160px, 28vw, 240px);
+        height: auto;
+        filter: drop-shadow(0 0 12px rgba(180, 210, 255, 0.15));
       }
+      #holm-draw .dp { fill: none; }
 
       /* ── Projection overlay ──────────────────────────────────────── */
       #projection-overlay {
@@ -336,12 +339,7 @@
       /* ── Mobile (≤767px) ─────────────────────────────────────────── */
       @media (max-width: 767px) {
         /* Loading */
-        #loading-wordmark {
-          font-size: 1.8rem;
-          letter-spacing: 0.22em;
-          gap: 0.35em;
-        }
-        #loading-wordmark svg { width: 18px; height: 18px; }
+        #holm-draw { width: clamp(130px, 55vw, 180px); }
 
         /* Caption — pushed higher so it breathes above thumb zone */
         .caption-layer { bottom: 14vh; }
@@ -408,12 +406,24 @@
   </head>
   <body>
     <div class="loading-screen" id="loading">
-      <span id="loading-wordmark">
-        HOLM
-        <svg width="22" height="22" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <polygon points="10,1 19,10 10,19 1,10" stroke="currentColor" stroke-width="1" fill="none"/>
-        </svg>
-      </span>
+      <!-- SVG paths drawn letter-by-letter on load -->
+      <svg id="holm-draw" viewBox="0 0 252 62" xmlns="http://www.w3.org/2000/svg">
+        <!-- H -->
+        <path class="dp" d="M 2,2 L 2,60 M 2,31 L 42,31 M 42,2 L 42,60"
+              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- O: start top, clockwise → right half → left half -->
+        <path class="dp" d="M 77,2 A 21,29 0 0 1 77,60 A 21,29 0 0 1 77,2"
+              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round"/>
+        <!-- L -->
+        <path class="dp" d="M 112,2 L 112,60 L 150,60"
+              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- M -->
+        <path class="dp" d="M 164,60 L 164,2 L 187,40 L 210,2 L 210,60"
+              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <!-- Diamond -->
+        <path class="dp" d="M 236,14 L 250,31 L 236,48 L 222,31 Z"
+              stroke="#d0e0f5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
     </div>
 
     <canvas id="scene-canvas"></canvas>
