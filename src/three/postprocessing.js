@@ -98,9 +98,9 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     composer.addPass(ssao);
   }
 
-  // 3. Bloom — lighter on mobile
+  // 3. Bloom — lighter + half-res on mobile (4× less GPU fill for blur passes)
   const bloom = new UnrealBloomPass(
-    new THREE.Vector2(w, h),
+    isMobile ? new THREE.Vector2(w / 2, h / 2) : new THREE.Vector2(w, h),
     isMobile ? 0.18 : 0.25,
     isMobile ? 0.35 : 0.4,
     isMobile ? 0.92 : 0.9,

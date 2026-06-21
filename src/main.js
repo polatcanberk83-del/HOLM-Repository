@@ -334,10 +334,11 @@ function hideProjection() {
 // ---------- Lenis ----------
 if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
 const lenis = new Lenis(isMobile ? {
-  smoothTouch:     true,
-  touchMultiplier: 0.09,
-  lerp:            0.05,
-  smoothWheel:     true,
+  // syncTouch: finger-tracking 1:1 during drag, momentum on release — no JS lerp latency
+  syncTouch:      true,
+  syncTouchLerp:  0.075,
+  touchMultiplier: 1.0,
+  smoothWheel:    true,
   wheelMultiplier: 0.28,
 } : {
   duration:        4.0,
@@ -346,6 +347,9 @@ const lenis = new Lenis(isMobile ? {
   touchMultiplier: 1.2,
   smoothTouch:     false,
 });
+// Prevent GSAP from stretching time after a dropped frame
+gsap.ticker.lagSmoothing(0);
+
 let _scrollHintHidden = false;
 lenis.on("scroll", ({ scroll, limit }) => {
   splineT = limit > 0 ? scroll / limit : 0;
@@ -354,13 +358,16 @@ lenis.on("scroll", ({ scroll, limit }) => {
     gsap.to(scrollHintEl, { opacity: 0, duration: 0.8, ease: "power2.out" });
   }
 });
-(function raf(t) { lenis.raf(t); requestAnimationFrame(raf); })(0);
+// Lenis is driven from tick() — no standalone RAF loop here
 
 // ---------- Render döngüsü ----------
 let _lastTick = 0;
 function tick(now = 0) {
   requestAnimationFrame(tick);
   _lastTick = now;
+
+  // Drive Lenis first so splineT is updated before camera reads it (single-loop, no desync)
+  lenis.raf(now);
 
   const elapsed = clock.getElapsedTime();
 
