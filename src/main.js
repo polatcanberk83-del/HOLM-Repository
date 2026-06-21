@@ -339,7 +339,7 @@ const lenis = new Lenis(isMobile ? {
   // smoothTouch: false — let native iOS/Android momentum handle touch
   // Lenis still fires scroll events so splineT stays in sync
   smoothTouch:     false,
-  touchMultiplier: 1.0,
+  touchMultiplier: 0.65,
 } : {
   duration:        4.0,
   smoothWheel:     true,
@@ -391,7 +391,7 @@ function tick(now = 0) {
   // Mobile: lerp T itself so camera stays on the curve — no straight-line shortcuts through models
   // Desktop: lerp 3D position for the gentle float effect
   if (isMobile) {
-    splineTSmooth += (splineT - splineTSmooth) * 0.16;
+    splineTSmooth += (splineT - splineTSmooth) * 0.11;
     _camTarget.copy(camPath.getPoint(splineTSmooth));
     camera.position.copy(_camTarget);
   } else {
@@ -486,12 +486,14 @@ async function boot() {
   const drawPaths = Array.from(document.querySelectorAll("#holm-draw .dp"));
   drawPaths.forEach(p => {
     const len = p.getTotalLength();
-    gsap.set(p, { strokeDasharray: len, strokeDashoffset: len });
+    // Unhide only after dashoffset is set so no stray dots appear before animation
+    gsap.set(p, { strokeDasharray: len, strokeDashoffset: len, visibility: "visible" });
   });
-  // Draw each letter sequentially with a tiny overlap
+  // Draw each letter sequentially — H is slower for emphasis
   const drawTl = gsap.timeline();
   drawPaths.forEach((p, i) => {
-    drawTl.to(p, { strokeDashoffset: 0, duration: 0.45, ease: "power2.inOut" }, i === 0 ? 0 : "-=0.05");
+    const dur = i === 0 ? 0.72 : 0.45;
+    drawTl.to(p, { strokeDashoffset: 0, duration: dur, ease: "power2.inOut" }, i === 0 ? 0 : "-=0.05");
   });
 
   // Load models concurrently with draw animation
