@@ -486,14 +486,19 @@ async function boot() {
   const drawPaths = Array.from(document.querySelectorAll("#holm-draw .dp"));
   drawPaths.forEach(p => {
     const len = p.getTotalLength();
-    // Unhide only after dashoffset is set so no stray dots appear before animation
-    gsap.set(p, { strokeDasharray: len, strokeDashoffset: len, visibility: "visible" });
+    // Set dash values but keep CSS visibility:hidden — each path reveals only on its own onStart
+    gsap.set(p, { strokeDasharray: len, strokeDashoffset: len });
   });
   // Draw each letter sequentially — H is slower for emphasis
   const drawTl = gsap.timeline();
   drawPaths.forEach((p, i) => {
     const dur = i === 0 ? 0.72 : 0.45;
-    drawTl.to(p, { strokeDashoffset: 0, duration: dur, ease: "power2.inOut" }, i === 0 ? 0 : "-=0.05");
+    drawTl.to(p, {
+      strokeDashoffset: 0,
+      duration: dur,
+      ease: "power2.inOut",
+      onStart: () => { p.style.visibility = "visible"; },
+    }, i === 0 ? 0 : "-=0.05");
   });
 
   // Load models concurrently with draw animation
