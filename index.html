@@ -69,16 +69,14 @@
         top: 5vh;
         left: 5vw;
         z-index: 3;
-        font-family: 'Fraunces', serif;
-        font-size: 1rem;
-        letter-spacing: 0.15em;
-        font-weight: 400;
         opacity: 0.85;
-        display: flex;
-        align-items: center;
-        gap: 0.55em;
+        line-height: 0;
       }
-      .wordmark svg { flex-shrink: 0; }
+      .wordmark svg {
+        width: 88px;
+        height: auto;
+        display: block;
+      }
 
       #loading-wordmark {
         display: inline-flex;
@@ -350,14 +348,9 @@
           line-height: 1.6;
         }
 
-        /* Wordmark — more top space */
-        .wordmark {
-          font-size: 0.9rem;
-          top: 5vh;
-          left: 5vw;
-          gap: 0.5em;
-        }
-        .wordmark svg { width: 9px; height: 9px; }
+        /* Wordmark */
+        .wordmark { top: 5vh; left: 5vw; }
+        .wordmark svg { width: 64px; }
 
         /* Scroll hint */
         .scroll-hint {
@@ -430,9 +423,17 @@
     <canvas id="scene-canvas"></canvas>
 
     <div class="wordmark">
-      HOLM
-      <svg width="10" height="10" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="10,1 19,10 10,19 1,10" stroke="currentColor" stroke-width="1.2" fill="none"/>
+      <svg viewBox="0 0 252 62" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path d="M 2,2 L 2,60 M 2,31 L 42,31 M 42,2 L 42,60"
+              stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 77,2 A 21,29 0 0 1 77,60 A 21,29 0 0 1 77,2"
+              stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+        <path d="M 112,2 L 112,60 L 150,60"
+              stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 164,60 L 164,2 L 187,40 L 210,2 L 210,60"
+              stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M 236,14 L 250,31 L 236,48 L 222,31 Z"
+              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
     </div>
 
