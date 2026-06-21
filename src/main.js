@@ -20,7 +20,7 @@ const MODEL_DEFS = [
   { file: "/models/hand.glb",        z:   0, scale: 3 },
   { file: "/models/monument.glb",    z: -12, scale: 0.57 },
   { file: "/models/hero_canvas.glb", z: -24, scale: 3 },
-  { file: "/models/void_figure.glb", z: -36 },
+  { file: "/models/void_figure.glb", z: -36, orbitN: isMobile ? 36 : 32 },
   { file: "/models/arm_crystal.glb", z: -48 },
 ].map(d => ({ ...d, caption: captionFor(d.file.split("/").pop()) }));
 
@@ -99,8 +99,9 @@ function buildPath() {
 
   MODEL_DEFS.forEach((def, i) => {
     const mz = def.z;
-    for (let s = 0; s <= ORBIT_N; s++) {
-      const a = (s / ORBIT_N) * Math.PI * 2;
+    const n  = def.orbitN ?? ORBIT_N; // per-model override, falls back to global
+    for (let s = 0; s <= n; s++) {
+      const a = (s / n) * Math.PI * 2;
       pts.push(new THREE.Vector3(Math.sin(a) * r, h, mz + Math.cos(a) * r));
     }
     if (i < MODEL_DEFS.length - 1) {
