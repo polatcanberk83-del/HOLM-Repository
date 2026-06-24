@@ -5,6 +5,10 @@ import gsap from "gsap";
 import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel }            from "./three/loader.js";
+import {
+  buildScaleBreakCurve, createOuterShell, createDebugTubes,
+  SB_ENTER, SB_EXIT, LOOK_VOID, LOOK_TRANSIT,
+} from "./three/scaleBreak.js";
 
 // ---------- Model tanımları ----------
 const MODEL_CAPTIONS = {
@@ -37,6 +41,9 @@ const isMobile      = window.innerWidth < 768 || 'ontouchstart' in window;
 const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isMobile);
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
+
+createOuterShell(scene);
+const _debugTubes = createDebugTubes(scene, sbCurve, camPath); // remove after tuning
 
 // ---------- Custom cursor + glow trail ----------
 let _mouseNX = 0.5, _mouseNY = 0.5;
@@ -122,7 +129,8 @@ function buildPath() {
   return new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
 }
 
-const camPath = buildPath();
+const camPath  = buildPath();
+const sbCurve  = buildScaleBreakCurve(camPath);
 
 // ---------- Scroll → spline ----------
 let splineT       = 0; // target T (from scroll)
@@ -360,6 +368,16 @@ lenis.on("scroll", ({ scroll, limit }) => {
 });
 // Lenis is driven from tick() — no standalone RAF loop here
 
+// ---------- Path selector (scale-break detour or main path) ----------
+function effectivePathPos(t) {
+  const c = Math.max(0, Math.min(1, t));
+  if (c >= SB_ENTER && c <= SB_EXIT) {
+    const lt = (c - SB_ENTER) / (SB_EXIT - SB_ENTER);
+    return sbCurve.getPoint(Math.max(0, Math.min(1, lt)));
+  }
+  return camPath.getPoint(c);
+}
+
 // ---------- Render döngüsü ----------
 let _lastTick = 0;
 function tick(now = 0) {
@@ -392,20 +410,27 @@ function tick(now = 0) {
   // Desktop: lerp 3D position for the gentle float effect
   if (isMobile) {
     splineTSmooth += (splineT - splineTSmooth) * 0.11;
-    _camTarget.copy(camPath.getPoint(splineTSmooth));
+    _camTarget.copy(effectivePathPos(splineTSmooth));
     camera.position.copy(_camTarget);
   } else {
-    _camTarget.copy(camPath.getPoint(splineT));
+    _camTarget.copy(effectivePathPos(splineT));
     camera.position.lerp(_camTarget, 0.07);
   }
 
   const { def: near, dist } = findNearest(camera.position);
   const inOrbit      = near && dist < ORBIT_R + 1.5;
-  // Corridor zone: camera turns to face wall; overlay fires later when closer
   const inCorridor   = camera.position.z < -56;
   const inProjection = camera.position.z < -68;
+  const inVoid       = camera.position.z > 13; // outside corridor mouth
 
-  if (inCorridor) {
+  if (inVoid) {
+    // Scale-break exterior: look back at corridor mouth, hold spotlight off to the side
+    _lookTarget.copy(camera.position.z > 20 ? LOOK_VOID : LOOK_TRANSIT);
+    _spotPos.set(6, 9, camera.position.z + 2);
+    _spotLook.set(0, 4, -10);
+    showCaption("");
+    if (projectionShown) { projectionShown = false; hideProjection(); }
+  } else if (inCorridor) {
     _lookTarget.set(0, 4, -89.5);
     _spotPos.set(0, 7, camera.position.z);
     _spotLook.set(0, 3.5, -89.5);
