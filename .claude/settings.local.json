@@ -6,7 +6,11 @@
       "Bash(robocopy \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site\" \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site-v1\" /E /XD node_modules .git /NP /NFL /NDL)",
       "Bash(robocopy \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site\" \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site-v1\" /E /XD node_modules .git /NP)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Melih Çakır\\\\Desktop\\\\holm-site-v1\" -Force | ForEach-Object { $_.Name })",
-      "Bash(Get-Content \"C:\\\\Users\\\\MELIHA~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Melih--ak-r-Desktop-holm-site\\\\9b175a08-ebab-4a74-aed7-9c16ad198643\\\\tasks\\\\bu7fbna7e.output\")"
+      "Bash(Get-Content \"C:\\\\Users\\\\MELIHA~1\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\c--Users-Melih--ak-r-Desktop-holm-site\\\\9b175a08-ebab-4a74-aed7-9c16ad198643\\\\tasks\\\\bu7fbna7e.output\")",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)",
+      "Bash(node -e \"console.log\\(require\\('./node_modules/lenis/package.json'\\).version\\)\")"
     ],
     "additionalDirectories": [
       "c:\\Users\\Melih Çakır\\.claude\\projects\\c--Users-Melih--ak-r-Desktop-holm-site\\memory",
