@@ -44,8 +44,7 @@ const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isM
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 
-createOuterShell(scene);
-const _debugTubes = createDebugTubes(scene, sbCurve, camPath); // remove after tuning
+// outer shell + debug tubes added after sbCurve is built (line ~135)
 
 // ---------- Custom cursor + glow trail ----------
 let _mouseNX = 0.5, _mouseNY = 0.5;
@@ -133,6 +132,9 @@ function buildPath() {
 
 const camPath  = buildPath();
 const sbCurve  = buildScaleBreakCurve(camPath);
+
+createOuterShell(scene);
+const _debugTubes = createDebugTubes(scene, sbCurve, camPath); // remove after tuning
 
 // ---------- Scroll → spline ----------
 let splineT       = 0; // target T (from scroll)
