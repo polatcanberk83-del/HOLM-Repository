@@ -175,7 +175,7 @@ function findNearest(camPos) {
 // ---------- Hover distortion state ----------
 const raycaster    = new THREE.Raycaster();
 const pointer      = new THREE.Vector2(-9, -9); // off-screen by default
-const clock        = new THREE.Clock();
+const timer        = new THREE.Timer();
 const distortItems = []; // { mesh, uniforms: { uTime, uIntensity }, defZ }
 let   hoveredZ     = null;
 
@@ -391,7 +391,8 @@ function tick(now = 0) {
   // Drive Lenis first so splineT is updated before camera reads it (single-loop, no desync)
   lenis.raf(now);
 
-  const elapsed = clock.getElapsedTime();
+  timer.update(now);
+  const elapsed = timer.getElapsed();
 
   // Hover raycast + distortion — desktop only
   if (!isMobile) {
