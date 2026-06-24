@@ -454,11 +454,7 @@ function tick(now = 0) {
     diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
   }
 
-  // Cloth wind distortion — naturalistic gusting (same formula as original cloth shader)
-  if (post.rippleUpdate) {
-    const gust = Math.max(0.0, (Math.sin(elapsed * 0.7) + Math.sin(elapsed * 2.3) * 0.5) + 0.5);
-    post.rippleUpdate(elapsed, 0.35 + gust * 0.2);
-  }
+
 
   post.composer.render();
 }

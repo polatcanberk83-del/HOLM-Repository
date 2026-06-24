@@ -5,7 +5,6 @@ import { UnrealBloomPass } from "three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass }      from "three/examples/jsm/postprocessing/ShaderPass.js";
 import { SSAOPass }        from "three/examples/jsm/postprocessing/SSAOPass.js";
 import { BokehPass }       from "three/examples/jsm/postprocessing/BokehPass.js";
-import { createRippleEffect } from "./ripple.js";
 
 // ---------- Chromatic Aberration ----------
 const ChromaShader = {
@@ -117,21 +116,14 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     composer.addPass(bokeh);
   }
 
-  // 5. Liquid cloth distortion — desktop only
-  let rippleEffect = null;
-  if (!isMobile) {
-    rippleEffect = createRippleEffect();
-    composer.addPass(rippleEffect.pass);
-  }
-
-  // 6. Chromatic aberration — desktop only
+  // 5. Chromatic aberration — desktop only
   let chroma = null;
   if (!isMobile) {
     chroma = new ShaderPass(ChromaShader);
     composer.addPass(chroma);
   }
 
-  // 7. Film grain + vignette — always last pass (mobile: grain disabled, vignette only)
+  // 6. Film grain + vignette — always last pass (mobile: grain disabled, vignette only)
   const grainVignette = new ShaderPass(GrainVignetteShader);
   if (isMobile) grainVignette.uniforms.uGrainAmp.value = 0;
   grainVignette.renderToScreen = true;
@@ -144,7 +136,6 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     ssao,
     bokeh,
     grainVignette,
-    rippleUpdate: rippleEffect ? rippleEffect.update : null,
     setSize(newW, newH) {
       composer.setSize(newW, newH);
       if (bloom) bloom.setSize(newW, newH);
