@@ -10,6 +10,9 @@ import {
   SB_ENTER, SB_EXIT, LOOK_VOID, LOOK_TRANSIT,
 } from "./three/scaleBreak.js";
 
+// isMobile must be declared before MODEL_DEFS (which uses it for orbitN)
+const isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
+
 // ---------- Model tanımları ----------
 const MODEL_CAPTIONS = {
   "hand.glb":        "Every brand begins like this.",
@@ -35,7 +38,6 @@ const loadingEl    = document.getElementById("loading");
 const wordmarkEl   = document.querySelector(".wordmark");
 const scrollHintEl = document.getElementById("scroll-hint");
 const diamondCursor = document.getElementById("diamond-cursor");
-const isMobile      = window.innerWidth < 768 || 'ontouchstart' in window;
 
 // ---------- Three.js ----------
 const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isMobile);
