@@ -6,7 +6,8 @@ import { createScene, createHalo, createProjectionPlane } from "./three/scene.js
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel }            from "./three/loader.js";
 import {
-  buildScaleBreakCurve, createOuterShell, createDebugTubes,
+  buildScaleBreakCurve, createOuterShell, createVoidLighting,
+  createFloorHint, createVoidDust, updateVoidDust,
   SB_ENTER, SB_EXIT, LOOK_VOID, LOOK_TRANSIT,
 } from "./three/scaleBreak.js";
 
@@ -44,7 +45,7 @@ const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isM
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 
-// outer shell + debug tubes added after sbCurve is built (line ~135)
+// void assets initialised after sbCurve (line ~135)
 
 // ---------- Custom cursor + glow trail ----------
 let _mouseNX = 0.5, _mouseNY = 0.5;
@@ -130,11 +131,14 @@ function buildPath() {
   return new THREE.CatmullRomCurve3(pts, false, "catmullrom", 0.5);
 }
 
-const camPath  = buildPath();
-const sbCurve  = buildScaleBreakCurve(camPath);
+const camPath = buildPath();
+const sbCurve = buildScaleBreakCurve(camPath, isMobile);
 
-createOuterShell(scene);
-const _debugTubes = createDebugTubes(scene, sbCurve, camPath); // remove after tuning
+// Phase 2-4 void assets
+createOuterShell(scene, isMobile);
+createVoidLighting(scene, isMobile);
+createFloorHint(scene);
+const voidDust = createVoidDust(scene, isMobile);
 
 // ---------- Scroll → spline ----------
 let splineT       = 0; // target T (from scroll)
@@ -419,7 +423,15 @@ function tick(now = 0) {
     camera.position.copy(_camTarget);
   } else {
     _camTarget.copy(effectivePathPos(splineT));
-    camera.position.lerp(_camTarget, 0.07);
+    // Dark-adaptation ease: slow camera as it crosses the corridor mouth into the void
+    const _voidFade = Math.max(0, Math.min(1, (camera.position.z - 8) / 14));
+    camera.position.lerp(_camTarget, 0.07 * (1.0 - _voidFade * 0.65));
+  }
+
+  // Dynamic fog: slightly thinner outside so marble block reads at ~67 units
+  if (scene.fog) {
+    const _fogTarget = camera.position.z > 13 ? 0.016 : 0.022;
+    scene.fog.density += (_fogTarget - scene.fog.density) * 0.018;
   }
 
   const { def: near, dist } = findNearest(camera.position);
@@ -429,11 +441,11 @@ function tick(now = 0) {
   const inVoid       = camera.position.z > 13; // outside corridor mouth
 
   if (inVoid) {
-    // Scale-break exterior: look back at corridor mouth, hold spotlight off to the side
     _lookTarget.copy(camera.position.z > 20 ? LOOK_VOID : LOOK_TRANSIT);
     _spotPos.set(6, 9, camera.position.z + 2);
     _spotLook.set(0, 4, -10);
     showCaption("");
+    updateVoidDust(voidDust, elapsed);
     if (projectionShown) { projectionShown = false; hideProjection(); }
   } else if (inCorridor) {
     _lookTarget.set(0, 4, -89.5);
