@@ -246,6 +246,10 @@ function animateDust(elapsed) {
   pos.needsUpdate = true;
 }
 
+// ---------- Model references for shatter crossfade ----------
+let voidFigureModel  = null;
+let heroCanvasModel  = null;
+
 // ---------- Model yükleme ----------
 async function loadAllModels() {
   const pedMat = new THREE.MeshStandardMaterial({
@@ -294,6 +298,9 @@ async function loadAllModels() {
       });
 
       scene.add(model);
+
+      if (def.file.includes("void_figure")) voidFigureModel = model;
+      if (def.file.includes("hero_canvas")) heroCanvasModel = model;
 
       // Podyum
       const ped = new THREE.Mesh(
@@ -465,17 +472,14 @@ function tick(now = 0) {
 
   // ── Shatter transition (hero_canvas → void_figure) ────────────────────────
   const effectT = isMobile ? splineTSmooth : splineT;
-  if (effectT >= SHATTER_T_ENTER && effectT <= SHATTER_T_DISSOLVE_END) {
-    if (!_shatterCaptured) {
-      _shatterCaptured = true;
-      shatter.capture();
-    }
-    shatter.update(effectT);
-  } else {
-    if (shatter.mesh.visible) shatter.mesh.visible = false;
-    // Allow re-capture if user scrolls back far enough
-    if (effectT < SHATTER_T_ENTER - 0.05) _shatterCaptured = false;
+  if (effectT >= SHATTER_T_ENTER && !_shatterCaptured) {
+    _shatterCaptured = true;
+    shatter.capture();
   }
+  // Re-arm when scrolled back far enough before the effect window
+  if (effectT < SHATTER_T_ENTER - 0.05) _shatterCaptured = false;
+  // update() handles range checks, material opacity, and mesh visibility internally
+  shatter.update(effectT);
 
   post.composer.render();
 }
@@ -525,6 +529,8 @@ async function boot() {
   await drawTl;
   // Then ensure models are ready (usually done by now on fast connections)
   await modelsPromise;
+  if (voidFigureModel)  shatter.setSurface(voidFigureModel);
+  if (heroCanvasModel)  shatter.setHeroCanvas(heroCanvasModel);
   if (!isMobile) createDustParticles();
 
   // Brief buffer for GPU shader compilation
