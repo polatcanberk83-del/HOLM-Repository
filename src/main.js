@@ -5,6 +5,14 @@ import gsap from "gsap";
 import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel }            from "./three/loader.js";
+import {
+  createShatterEffect,
+  SHATTER_T_ENTER,
+  SHATTER_T_DISSOLVE_END,
+} from "./three/shatter.js";
+
+// ---------- Device detection (must precede MODEL_DEFS) ----------
+const isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
 
 // ---------- Model tanımları ----------
 const MODEL_CAPTIONS = {
@@ -31,12 +39,13 @@ const loadingEl    = document.getElementById("loading");
 const wordmarkEl   = document.querySelector(".wordmark");
 const scrollHintEl = document.getElementById("scroll-hint");
 const diamondCursor = document.getElementById("diamond-cursor");
-const isMobile      = window.innerWidth < 768 || 'ontouchstart' in window;
 
 // ---------- Three.js ----------
 const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isMobile);
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
+const shatter   = createShatterEffect(renderer, scene, camera, isMobile);
+let _shatterCaptured = false;
 
 // ---------- Custom cursor + glow trail ----------
 let _mouseNX = 0.5, _mouseNY = 0.5;
@@ -454,7 +463,19 @@ function tick(now = 0) {
     diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
   }
 
-
+  // ── Shatter transition (hero_canvas → void_figure) ────────────────────────
+  const effectT = isMobile ? splineTSmooth : splineT;
+  if (effectT >= SHATTER_T_ENTER && effectT <= SHATTER_T_DISSOLVE_END) {
+    if (!_shatterCaptured) {
+      _shatterCaptured = true;
+      shatter.capture();
+    }
+    shatter.update(effectT);
+  } else {
+    if (shatter.mesh.visible) shatter.mesh.visible = false;
+    // Allow re-capture if user scrolls back far enough
+    if (effectT < SHATTER_T_ENTER - 0.05) _shatterCaptured = false;
+  }
 
   post.composer.render();
 }
