@@ -1,22 +1,28 @@
 import * as THREE from "three";
 import { MeshSurfaceSampler } from "three/examples/jsm/math/MeshSurfaceSampler.js";
 
-// ── Tunable constants ─────────────────────────────────────────────────────────
-export const SHATTER_T_ENTER        = 0.55; // capture + scatter begins
-export const SHATTER_T_TEXT         = 0.59; // scatter done → gather begins
-export const SHATTER_T_GATHER_DONE  = 0.64; // cubes fully in void_figure form
-export const SHATTER_T_DISSOLVE_END = 0.70; // crossfade complete
+// ── Tunable timing constants (scroll T, 0–1) ──────────────────────────────────
+// These are tuned so the dissolve crossfade happens while the camera is still
+// in the front-quarter of the void_figure orbit (~0–25% around).
+export const SHATTER_T_ENTER        = 0.51; // capture fires, tiles freeze on screen
+const        SHATTER_T_SCATTER_START = 0.53; // freeze hold ends → tiles fly apart
+export const SHATTER_T_DARK_DONE    = 0.56; // BG fully dark, tiles fully scattered
+export const SHATTER_T_TEXT_IN      = 0.55; // gathering text starts fading in
+export const SHATTER_T_TEXT_FULL    = 0.57; // text fully visible (hold begins)
+export const SHATTER_T_TEXT_OUT     = 0.58; // text starts fading out
+export const SHATTER_T_TEXT_GONE    = 0.60; // text gone → gather begins
+export const SHATTER_T_GATHER_DONE  = 0.62; // cubes fully at void_figure surface
+export const SHATTER_T_DISSOLVE_END = 0.65; // crossfade complete, BG fully restored
 
 const GRID_DEPTH     = 3.5;
 const SCATTER_DIST   = 8;
 const CUBE_THICKNESS = 0.04;
 
-const COLS_D = 32, ROWS_D = 18; // 576 instances desktop
-const COLS_M = 10, ROWS_M =  6; //  60 instances mobile
+const COLS_D = 32, ROWS_D = 18; // 576 desktop
+const COLS_M = 10, ROWS_M =  6; //  60 mobile
 const SCATTER_DIST_M = 5;
 
-// Cube tint toward void_figure's cool stone tone during gather phase
-const TINT_COLOR = new THREE.Color(0x203050);
+const TINT_COLOR = new THREE.Color(0x203050); // cool stone blue during gather
 const TINT_MAX   = 0.55;
 
 function smoothstep(t) {
@@ -46,25 +52,23 @@ export function createShatterEffect(renderer, scene, camera, isMobile) {
     for (let col = 0; col < COLS; col++) {
       const i = row * COLS + col;
       uvData[i * 4 + 0] = col * du;
-      uvData[i * 4 + 1] = 1 - (row + 1) * dv; // V=1 top in WebGL render targets
+      uvData[i * 4 + 1] = 1 - (row + 1) * dv; // V=1 at top in WebGL render targets
       uvData[i * 4 + 2] = du;
       uvData[i * 4 + 3] = dv;
     }
   }
   const uvAttr = new THREE.InstancedBufferAttribute(uvData, 4);
 
-  // ── Geometry ──────────────────────────────────────────────────────────────
   const geo = new THREE.BoxGeometry(1, 1, CUBE_THICKNESS);
   geo.setAttribute("instanceUV", uvAttr);
 
-  // ── Uniforms ──────────────────────────────────────────────────────────────
+  // ── Cube shader uniforms ──────────────────────────────────────────────────
   const _su = {
     uOpacity:    { value: 1.0 },
     uTintColor:  { value: TINT_COLOR.clone() },
     uTintAmount: { value: 0.0 },
   };
 
-  // ── Material: MeshBasicMaterial + onBeforeCompile ────────────────────────
   const mat = new THREE.MeshBasicMaterial({
     map:         fbo.texture,
     transparent: true,
@@ -89,7 +93,6 @@ void main() {`,
 vTileUv = vec2(instanceUV.x + uv.x * instanceUV.z,
                instanceUV.y + uv.y * instanceUV.w);`,
     );
-
     shader.fragmentShader = `
 uniform sampler2D map;
 uniform float uOpacity;
@@ -105,7 +108,6 @@ void main() {
   };
   mat.customProgramCacheKey = () => "shatter_tile";
 
-  // ── InstancedMesh ─────────────────────────────────────────────────────────
   const mesh = new THREE.InstancedMesh(geo, mat, N);
   mesh.frustumCulled = false;
   mesh.visible = false;
@@ -119,7 +121,7 @@ void main() {
 
   let tileW = 1, tileH = 1;
   let _hasGatherTargets = false;
-  let _restored = true;
+  let _restored = true; // guard: run restore logic only once per exit
 
   const _dummy = new THREE.Object3D();
   const _scale  = new THREE.Vector3();
@@ -137,9 +139,7 @@ void main() {
     });
   }
 
-  function _setMatsOpacity(mats, opacity) {
-    for (const m of mats) m.opacity = opacity;
-  }
+  function _setOpacity(mats, v) { for (const m of mats) m.opacity = v; }
 
   function _restoreMats() {
     for (const m of _heroCanvasMats) m.opacity = 1.0;
@@ -188,7 +188,7 @@ void main() {
     }
   }
 
-  // ── Public: sample void_figure surface; prime its materials ───────────────
+  // ── Public: sample void_figure surface; prime transparency ───────────────
   function setSurface(root) {
     root.updateMatrixWorld(true);
 
@@ -201,7 +201,6 @@ void main() {
       return;
     }
 
-    // Enable transparency before first render so shader compiles correctly
     _collectMats(root, _voidFigureMats);
     for (const m of _voidFigureMats) { m.transparent = true; m.opacity = 1.0; }
 
@@ -224,7 +223,7 @@ void main() {
       allPts.push(allPts[Math.floor(Math.random() * allPts.length)].clone());
     }
 
-    // Shuffle so adjacent cube indices target different mesh regions (organic gather)
+    // Shuffle so cube indices don't clump per mesh region — organic gather
     for (let i = allPts.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [allPts[i], allPts[j]] = [allPts[j], allPts[i]];
@@ -266,12 +265,16 @@ void main() {
     mesh.visible = true;
   }
 
-  // ── Public: drive animation from scroll T ────────────────────────────────
-  // Phase 1 (ENTER→TEXT):        scatter — hero_canvas fades out
-  // Phase 2 (TEXT→GATHER_DONE):  gather  — void_figure real model fades out, cubes tint
-  // Phase 3 (GATHER_DONE→END):   dissolve — cubes fade+shrink, real model fades back in
+  // ── Public: drive animation. Returns { bgDark, textOpacity } each frame. ─
+  //
+  // Phase 1  [ENTER → DARK_DONE]:  scatter + BG darkens + hero_canvas fades
+  // Phase 2  [DARK_DONE → TEXT_GONE]: cubes hold at scatter; text in/hold/out
+  // Phase 3  [TEXT_GONE → GATHER_DONE]: gather into form; BG recovers; tint
+  // Phase 4  [GATHER_DONE → DISSOLVE_END]: cubes shrink/fade; real model in
+  //
   function update(effectT) {
-    // Outside effect range: restore everything and idle
+    const OUT = { bgDark: 0, textOpacity: 0 };
+
     if (effectT < SHATTER_T_ENTER || effectT > SHATTER_T_DISSOLVE_END) {
       if (!_restored) {
         mesh.visible = false;
@@ -280,7 +283,7 @@ void main() {
         _su.uTintAmount.value = 0.0;
         _restored = true;
       }
-      return;
+      return OUT;
     }
 
     _restored = false;
@@ -288,56 +291,111 @@ void main() {
 
     let sp             = 0;
     let rotP           = 0;
-    let fromPos, toPos;
     let scaleMultiplier = 1.0;
+    let fromPos, toPos;
+    let bgDark      = 0;
+    let textOpacity = 0;
 
-    if (effectT < SHATTER_T_TEXT) {
-      // ── Phase 1: scatter ─────────────────────────────────────────────────
-      const p1 = smoothstep((effectT - SHATTER_T_ENTER) / (SHATTER_T_TEXT - SHATTER_T_ENTER));
-      sp      = p1;
+    // ── Phase 1a: freeze hold — tiles cover screen as a stationary mosaic ───────
+    if (effectT < SHATTER_T_SCATTER_START) {
+      // sp=0 keeps all tiles at gridPos (exact screen coverage = freeze-frame).
+      // Hero/void models stay at full opacity behind the tile layer.
+      sp      = 0;
+      rotP    = 0;
       fromPos = gridPos;
       toPos   = scatterPos;
-      rotP    = sp;
+      bgDark  = 0;
 
-      _setMatsOpacity(_heroCanvasMats, 1 - sp);
-      _setMatsOpacity(_voidFigureMats, 1.0);
+      _setOpacity(_heroCanvasMats, 1.0);
+      _setOpacity(_voidFigureMats, 1.0);
       _su.uOpacity.value    = 1.0;
       _su.uTintAmount.value = 0.0;
 
-    } else if (_hasGatherTargets && effectT < SHATTER_T_GATHER_DONE) {
-      // ── Phase 2: gather into void_figure form ────────────────────────────
-      const p2 = smoothstep((effectT - SHATTER_T_TEXT) / (SHATTER_T_GATHER_DONE - SHATTER_T_TEXT));
-      sp      = p2;
-      rotP    = 1 - sp;
-      fromPos = scatterPos;
-      toPos   = gatherPos;
+    // ── Phase 1b: scatter — tiles fly apart, BG darkens ───────────────────────
+    } else if (effectT < SHATTER_T_DARK_DONE) {
+      const p1 = smoothstep(
+        (effectT - SHATTER_T_SCATTER_START) / (SHATTER_T_DARK_DONE - SHATTER_T_SCATTER_START),
+      );
+      sp      = p1;
+      rotP    = p1;
+      fromPos = gridPos;
+      toPos   = scatterPos;
+      bgDark  = p1;
 
-      _setMatsOpacity(_heroCanvasMats, 0.0);
-      _setMatsOpacity(_voidFigureMats, 1 - sp); // real model fades as cube-form solidifies
+      _setOpacity(_heroCanvasMats, 1 - p1);
+      _setOpacity(_voidFigureMats, 1 - p1);
       _su.uOpacity.value    = 1.0;
-      _su.uTintAmount.value = sp * TINT_MAX;
+      _su.uTintAmount.value = 0.0;
 
-    } else if (_hasGatherTargets) {
-      // ── Phase 3: crossfade dissolve ───────────────────────────────────────
-      const p3 = smoothstep((effectT - SHATTER_T_GATHER_DONE) / (SHATTER_T_DISSOLVE_END - SHATTER_T_GATHER_DONE));
-      sp             = 1;          // cubes stay at gathered positions
+    // ── Phase 2: hold (cubes scattered, text appears / holds / fades) ────────
+    } else if (effectT < SHATTER_T_TEXT_GONE) {
+      sp      = 1;
+      rotP    = 0; // cubes have settled
+      fromPos = gridPos;
+      toPos   = scatterPos;
+      bgDark  = 1.0;
+
+      _setOpacity(_heroCanvasMats, 0.0);
+      _setOpacity(_voidFigureMats, 0.0); // hidden — cubes float in dark void
+      _su.uOpacity.value    = 1.0;
+      _su.uTintAmount.value = 0.0;
+
+      // Text sub-phases
+      if (effectT < SHATTER_T_TEXT_FULL) {
+        textOpacity = smoothstep(
+          (effectT - SHATTER_T_TEXT_IN) / (SHATTER_T_TEXT_FULL - SHATTER_T_TEXT_IN),
+        );
+      } else if (effectT < SHATTER_T_TEXT_OUT) {
+        textOpacity = 1.0;
+      } else {
+        textOpacity = 1 - smoothstep(
+          (effectT - SHATTER_T_TEXT_OUT) / (SHATTER_T_TEXT_GONE - SHATTER_T_TEXT_OUT),
+        );
+      }
+
+    // ── Phase 3: gather into void_figure form; BG recovers ───────────────────
+    } else if (!_hasGatherTargets || effectT < SHATTER_T_GATHER_DONE) {
+
+      if (_hasGatherTargets) {
+        const p3 = smoothstep(
+          (effectT - SHATTER_T_TEXT_GONE) / (SHATTER_T_GATHER_DONE - SHATTER_T_TEXT_GONE),
+        );
+        sp      = p3;
+        rotP    = 1 - p3;
+        fromPos = scatterPos;
+        toPos   = gatherPos;
+        bgDark  = 1 - p3; // BG recovers as cubes gather
+
+        _setOpacity(_heroCanvasMats, 0.0);
+        _setOpacity(_voidFigureMats, 0.0); // hidden — cube-form IS the figure
+        _su.uOpacity.value    = 1.0;
+        _su.uTintAmount.value = p3 * TINT_MAX;
+      } else {
+        // Stage A fallback: return to grid
+        const backRaw = (effectT - SHATTER_T_TEXT_GONE) / (SHATTER_T_DISSOLVE_END - SHATTER_T_TEXT_GONE);
+        sp      = smoothstep(1 - backRaw);
+        rotP    = sp;
+        fromPos = gridPos;
+        toPos   = scatterPos;
+        bgDark  = 1 - smoothstep(backRaw);
+      }
+
+    // ── Phase 4: dissolve — cubes shrink/fade, real model fades in ───────────
+    } else {
+      const p4 = smoothstep(
+        (effectT - SHATTER_T_GATHER_DONE) / (SHATTER_T_DISSOLVE_END - SHATTER_T_GATHER_DONE),
+      );
+      sp             = 1;
       rotP           = 0;
       fromPos        = gatherPos;
       toPos          = gatherPos;
-      scaleMultiplier = 1 - p3;   // cubes shrink to zero
+      scaleMultiplier = 1 - p4;
+      bgDark         = 0;
 
-      _setMatsOpacity(_heroCanvasMats, 0.0);
-      _setMatsOpacity(_voidFigureMats, p3); // real model fades back in
-      _su.uOpacity.value    = 1 - p3;
-      _su.uTintAmount.value = TINT_MAX * (1 - p3);
-
-    } else {
-      // ── Stage A fallback: return to grid (no gather targets) ──────────────
-      const backRaw = (effectT - SHATTER_T_TEXT) / (SHATTER_T_DISSOLVE_END - SHATTER_T_TEXT);
-      sp      = smoothstep(1 - backRaw);
-      fromPos = gridPos;
-      toPos   = scatterPos;
-      rotP    = sp;
+      _setOpacity(_heroCanvasMats, 0.0);
+      _setOpacity(_voidFigureMats, p4);
+      _su.uOpacity.value    = 1 - p4;
+      _su.uTintAmount.value = TINT_MAX * (1 - p4);
     }
 
     _scale.set(tileW * scaleMultiplier, tileH * scaleMultiplier, CUBE_THICKNESS * scaleMultiplier);
@@ -353,6 +411,8 @@ void main() {
       mesh.setMatrixAt(i, _dummy.matrix);
     }
     mesh.instanceMatrix.needsUpdate = true;
+
+    return { bgDark, textOpacity };
   }
 
   function dispose() {

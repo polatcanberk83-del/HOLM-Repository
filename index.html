@@ -395,6 +395,80 @@
         .caption { font-size: clamp(0.78rem, 4.2vw, 0.95rem); }
         .proj-line { font-size: clamp(0.76rem, 3.8vw, 0.9rem); }
       }
+
+      /* ── Gathering text ──────────────────────────────────────────── */
+      #gathering-text {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        width: 80vw;
+        max-width: 860px;
+        font-family: 'Fraunces', serif;
+        font-style: italic;
+        font-weight: 300;
+        font-size: clamp(1.7rem, 4.2vw, 3.4rem);
+        line-height: 1.35;
+        text-align: center;
+        pointer-events: none;
+        z-index: 8;
+        opacity: 0;           /* JS drives this every frame */
+        letter-spacing: 0.01em;
+
+        /* Gradient fill — shimmer sweeps right-to-left on a loop */
+        background: linear-gradient(
+          105deg,
+          rgba(160, 188, 255, 0.88) 0%,
+          rgba(195, 215, 255, 0.94) 28%,
+          rgba(235, 243, 255, 1.00) 50%,
+          rgba(195, 215, 255, 0.94) 72%,
+          rgba(160, 188, 255, 0.88) 100%
+        );
+        background-size: 280% 100%;
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+
+        /* Outer glow via filter (works on the clipped text shape) */
+        filter:
+          drop-shadow(0 0  5px rgba(150, 185, 255, 0.90))
+          drop-shadow(0 0 18px rgba(110, 155, 255, 0.65))
+          drop-shadow(0 0 48px rgba( 85, 125, 245, 0.38))
+          drop-shadow(0 0 96px rgba( 70, 105, 225, 0.18));
+
+        animation:
+          gathering-shimmer   4.5s ease-in-out infinite,
+          gathering-glow-beat 2.6s ease-in-out infinite alternate;
+        will-change: opacity, filter;
+      }
+
+      @keyframes gathering-shimmer {
+        0%   { background-position: 120% 50%; }
+        100% { background-position: -80% 50%; }
+      }
+
+      @keyframes gathering-glow-beat {
+        from {
+          filter:
+            drop-shadow(0 0  4px rgba(135, 170, 255, 0.80))
+            drop-shadow(0 0 14px rgba( 95, 140, 255, 0.55))
+            drop-shadow(0 0 38px rgba( 75, 115, 240, 0.30));
+        }
+        to {
+          filter:
+            drop-shadow(0 0  8px rgba(185, 215, 255, 1.00))
+            drop-shadow(0 0 26px rgba(150, 190, 255, 0.82))
+            drop-shadow(0 0 65px rgba(115, 158, 255, 0.52))
+            drop-shadow(0 0 120px rgba( 90, 128, 240, 0.28));
+        }
+      }
+
+      @media (max-width: 767px) {
+        #gathering-text {
+          font-size: clamp(1.25rem, 6vw, 2rem);
+          width: 86vw;
+        }
+      }
     </style>
   </head>
   <body>
@@ -466,6 +540,9 @@
         <span class="proj-cta-text-hover">Book a call →</span>
       </a>
     </div>
+
+    <!-- Gathering sequence typographic moment -->
+    <div id="gathering-text">Gathering the pieces, one by one.</div>
 
     <div id="diamond-cursor">
       <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">

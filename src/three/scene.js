@@ -107,7 +107,7 @@ export function createScene(canvas, isMobile = false) {
   }
   window.addEventListener("resize", onResize);
 
-  return { scene, renderer, camera, spotLight, onResize };
+  return { scene, renderer, camera, spotLight, ambient, hemi, onResize };
 }
 
 // ---------- Projection plane (end wall) ----------

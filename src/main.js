@@ -33,15 +33,21 @@ const MODEL_DEFS = [
 ].map(d => ({ ...d, caption: captionFor(d.file.split("/").pop()) }));
 
 // ---------- DOM ----------
-const canvas       = document.getElementById("scene-canvas");
-const captionEl    = document.getElementById("caption");
+const canvas          = document.getElementById("scene-canvas");
+const captionEl       = document.getElementById("caption");
+const gatheringTextEl = document.getElementById("gathering-text");
 const loadingEl    = document.getElementById("loading");
 const wordmarkEl   = document.querySelector(".wordmark");
 const scrollHintEl = document.getElementById("scroll-hint");
 const diamondCursor = document.getElementById("diamond-cursor");
 
 // ---------- Three.js ----------
-const { scene, renderer, camera, spotLight, onResize } = createScene(canvas, isMobile);
+const { scene, renderer, camera, spotLight, ambient, hemi, onResize } = createScene(canvas, isMobile);
+
+// Base light intensities (must match scene.js) — driven down during gathering effect
+const AMBIENT_INTENSITY_BASE = 32.0;
+const HEMI_INTENSITY_BASE    = 26.0;
+const SPOT_INTENSITY_BASE    = 30.0;
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 const shatter   = createShatterEffect(renderer, scene, camera, isMobile);
@@ -108,16 +114,19 @@ function buildPath() {
 
   MODEL_DEFS.forEach((def, i) => {
     const mz = def.z;
-    const n  = def.orbitN ?? ORBIT_N; // per-model override, falls back to global
-    for (let s = 0; s <= n; s++) {
+    const n  = def.orbitN ?? ORBIT_N;
+    // s < n (not <=) — avoids a duplicate closing point that pinches the
+    // CatmullRom tangent to zero and causes a brake-then-lurch on exit.
+    for (let s = 0; s < n; s++) {
       const a = (s / n) * Math.PI * 2;
       pts.push(new THREE.Vector3(Math.sin(a) * r, h, mz + Math.cos(a) * r));
     }
     if (i < MODEL_DEFS.length - 1) {
       const nextZ = MODEL_DEFS[i + 1].z;
-      pts.push(new THREE.Vector3(r * 1.5, h, mz));
-      pts.push(new THREE.Vector3(r * 0.8, h, mz - r - 1));
-      pts.push(new THREE.Vector3(0,       h, nextZ + r + 1));
+      // Gentler arc: was r*1.5 (too wide), now r*0.85 keeps the sweep controlled
+      pts.push(new THREE.Vector3(r * 0.85, h, mz));
+      pts.push(new THREE.Vector3(r * 0.45, h, mz - r - 1));
+      pts.push(new THREE.Vector3(0,        h, nextZ + r + 1));
     }
   });
 
@@ -436,8 +445,9 @@ function tick(now = 0) {
     showCaption(near.caption);
     if (projectionShown) { projectionShown = false; hideProjection(); }
   } else {
-    const next = MODEL_DEFS.find(d => d.z < camera.position.z - 1);
-    _lookTarget.set(0, 1.5, next ? next.z : camera.position.z - 10);
+    // Look 8 units ahead on Z — changes smoothly with camera position,
+    // no discrete jump when `nearest model` switches between transitions.
+    _lookTarget.set(0, 1.5, camera.position.z - 8);
     _spotPos.set(0, 6, camera.position.z - 3);
     _spotLook.set(0, 0.5, camera.position.z - 8);
     if (dist > ORBIT_R * 3) showCaption("");
@@ -445,7 +455,8 @@ function tick(now = 0) {
     projPlane.visible = false;
   }
 
-  _lookNow.lerp(_lookTarget, 0.07);
+  // 0.03 ≈ ~1.5s to 95% — slow enough that look target jumps feel like a gradual pan
+  _lookNow.lerp(_lookTarget, 0.03);
   camera.lookAt(_lookNow);
 
   spotLight.position.lerp(_spotPos, 0.05);
@@ -476,10 +487,22 @@ function tick(now = 0) {
     _shatterCaptured = true;
     shatter.capture();
   }
-  // Re-arm when scrolled back far enough before the effect window
   if (effectT < SHATTER_T_ENTER - 0.05) _shatterCaptured = false;
-  // update() handles range checks, material opacity, and mesh visibility internally
-  shatter.update(effectT);
+
+  const { bgDark, textOpacity } = shatter.update(effectT);
+
+  // Background dimming: only ambient+hemi+spot fade; cubes use MeshBasicMaterial
+  // so they stay at captured-texture brightness regardless of scene light levels.
+  const brightF = 1 - bgDark * 0.92;
+  ambient.intensity   = AMBIENT_INTENSITY_BASE  * brightF;
+  hemi.intensity      = HEMI_INTENSITY_BASE     * brightF;
+  spotLight.intensity = SPOT_INTENSITY_BASE     * Math.max(brightF, 0.12);
+
+  // Gathering text DOM element
+  if (gatheringTextEl) gatheringTextEl.style.opacity = textOpacity;
+
+  // Suppress model caption while the gathering sequence is active
+  if (textOpacity > 0.01) showCaption("");
 
   post.composer.render();
 }
