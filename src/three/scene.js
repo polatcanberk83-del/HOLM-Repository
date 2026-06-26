@@ -29,11 +29,20 @@ export function createScene(canvas, isMobile = false) {
   // ---------- Museum Room ----------
   // BoxGeometry 20w × 8h × 60d, BackSide → içi görünür
   // Merkez (0, 4, -25) → Z: 5'ten -55'e, Y: 0'dan 8'e
+  //
+  // WALL_EMISSIVE: duvarın kendi içinden gelen homojen mavi parıltı.
+  // Point light'lardan bağımsız, tüm yüzey eşit tonda aydınlanır.
+  // Bloom eşiği (threshold=0.9, exposure=6.5): mavi kanal 0x1c (0.11 linear)
+  // × WALL_EMISSIVE × 6.5 ≈ 0.43 — eşiğin çok altında, bloom şişirmez.
+  // İnce ayar: bu tek değeri değiştir.
+  const WALL_EMISSIVE = 2.5;   // ince ayar buradan — 0=sönük, 3+ parlak
   const roomMat = new THREE.MeshStandardMaterial({
-    color:     0x1c1c2a,
-    roughness: 0.95,
-    metalness: 0,
-    side:      THREE.BackSide,
+    color:             0x1c1c2a,
+    roughness:         0.95,
+    metalness:         0,
+    side:              THREE.BackSide,
+    emissive:          new THREE.Color(0x0e1c30),
+    emissiveIntensity: WALL_EMISSIVE,
   });
   const room = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 102), roomMat);
   room.position.set(0, 4, -39);
@@ -75,9 +84,12 @@ export function createScene(canvas, isMobile = false) {
   // Her model pozisyonunda sabit dolgu ışığı (Z=0,-12,-24,-36,-48,-60)
   // Spotlight aktif modeli aydınlatırken diğerleri bu ışıkla siluet verir.
   // Fill lights on left/right walls so they light the room without blasting models from above
+  // WALL_FILL_DIST: yayılım yarıçapı — sadece bu değeri artırarak lekelerin kenarları birbirine karışır.
+  // Parlaklık (4000) ve decay (2) sabit — odanın karanlığı korunur.
+  const WALL_FILL_DIST = 36; // ince ayar buradan — orijinal 28, şu an 36 (lekelerin kenarları birbirine karışsın)
   (isMobile ? [0, -24, -48] : [0, -12, -24, -36, -48]).forEach(z => {
     [-8, 8].forEach(x => {
-      const fill = new THREE.PointLight(0x3a5080, 4000, 28, 2);
+      const fill = new THREE.PointLight(0x3a5080, 4000, WALL_FILL_DIST, 2);
       fill.position.set(x, 4, z);
       scene.add(fill);
     });
