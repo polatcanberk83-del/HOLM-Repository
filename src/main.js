@@ -114,19 +114,16 @@ function buildPath() {
 
   MODEL_DEFS.forEach((def, i) => {
     const mz = def.z;
-    const n  = def.orbitN ?? ORBIT_N;
-    // s < n (not <=) — avoids a duplicate closing point that pinches the
-    // CatmullRom tangent to zero and causes a brake-then-lurch on exit.
-    for (let s = 0; s < n; s++) {
+    const n  = def.orbitN ?? ORBIT_N; // per-model override, falls back to global
+    for (let s = 0; s <= n; s++) {
       const a = (s / n) * Math.PI * 2;
       pts.push(new THREE.Vector3(Math.sin(a) * r, h, mz + Math.cos(a) * r));
     }
     if (i < MODEL_DEFS.length - 1) {
       const nextZ = MODEL_DEFS[i + 1].z;
-      // Gentler arc: was r*1.5 (too wide), now r*0.85 keeps the sweep controlled
-      pts.push(new THREE.Vector3(r * 0.85, h, mz));
-      pts.push(new THREE.Vector3(r * 0.45, h, mz - r - 1));
-      pts.push(new THREE.Vector3(0,        h, nextZ + r + 1));
+      pts.push(new THREE.Vector3(r * 1.5, h, mz));
+      pts.push(new THREE.Vector3(r * 0.8, h, mz - r - 1));
+      pts.push(new THREE.Vector3(0,       h, nextZ + r + 1));
     }
   });
 
@@ -445,9 +442,8 @@ function tick(now = 0) {
     showCaption(near.caption);
     if (projectionShown) { projectionShown = false; hideProjection(); }
   } else {
-    // Look 8 units ahead on Z — changes smoothly with camera position,
-    // no discrete jump when `nearest model` switches between transitions.
-    _lookTarget.set(0, 1.5, camera.position.z - 8);
+    const next = MODEL_DEFS.find(d => d.z < camera.position.z - 1);
+    _lookTarget.set(0, 1.5, next ? next.z : camera.position.z - 10);
     _spotPos.set(0, 6, camera.position.z - 3);
     _spotLook.set(0, 0.5, camera.position.z - 8);
     if (dist > ORBIT_R * 3) showCaption("");
@@ -455,8 +451,7 @@ function tick(now = 0) {
     projPlane.visible = false;
   }
 
-  // 0.03 ≈ ~1.5s to 95% — slow enough that look target jumps feel like a gradual pan
-  _lookNow.lerp(_lookTarget, 0.03);
+  _lookNow.lerp(_lookTarget, 0.07);
   camera.lookAt(_lookNow);
 
   spotLight.position.lerp(_spotPos, 0.05);
