@@ -42,7 +42,7 @@ const scrollHintEl = document.getElementById("scroll-hint");
 const diamondCursor = document.getElementById("diamond-cursor");
 
 // ---------- Three.js ----------
-const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, onResize } = createScene(canvas, isMobile);
+const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms, onResize } = createScene(canvas, isMobile);
 
 // Base light intensities (must match scene.js) — driven down during gathering effect
 const AMBIENT_INTENSITY_BASE  =  55.0; // scene.js ambient ile senkron
@@ -472,6 +472,7 @@ function tick(now = 0) {
   if (post.grainVignette) {
     post.grainVignette.uniforms.uTime.value = elapsed;
   }
+  wallUniforms.uTime.value = elapsed;
 
   // Animate dust particles — desktop only
   if (!isMobile) animateDust(elapsed);

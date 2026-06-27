@@ -35,7 +35,9 @@ export function createScene(canvas, isMobile = false) {
   // Bloom eşiği (threshold=0.9, exposure=6.5): mavi kanal 0x1c (0.11 linear)
   // × WALL_EMISSIVE × 6.5 ≈ 0.43 — eşiğin çok altında, bloom şişirmez.
   // İnce ayar: bu tek değeri değiştir.
-  const WALL_EMISSIVE = 20.0;  // ince ayar buradan — modeli etkilemez, sadece duvar yüzeyi
+  const WALL_EMISSIVE = 25.0;  // ince ayar buradan — modeli etkilemez, sadece duvar yüzeyi
+  const wallUniforms  = { uTime: { value: 0 } };
+
   const roomMat = new THREE.MeshStandardMaterial({
     color:             0x1c1c2a,
     roughness:         0.95,
@@ -44,6 +46,33 @@ export function createScene(canvas, isMobile = false) {
     emissive:          new THREE.Color(0x0e1c30),
     emissiveIntensity: WALL_EMISSIVE,
   });
+
+  // Moving gradient: iki örtüşen sinüs dalgası Z boyunca kayıyor
+  roomMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uTime = wallUniforms.uTime;
+    shader.vertexShader = shader.vertexShader.replace(
+      'void main() {',
+      `varying vec3 vWorldPos;\nvoid main() {`,
+    );
+    shader.vertexShader = shader.vertexShader.replace(
+      '#include <begin_vertex>',
+      `#include <begin_vertex>
+vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'void main() {',
+      `uniform float uTime;\nvarying vec3 vWorldPos;\nvoid main() {`,
+    );
+    shader.fragmentShader = shader.fragmentShader.replace(
+      'vec3 totalEmissiveRadiance = emissive;',
+      `float _z  = clamp((vWorldPos.z + 80.0) / 90.0, 0.0, 1.0);
+float _w1 = sin(_z * 7.0 - uTime * 0.45) * 0.5 + 0.5;
+float _w2 = sin(_z * 3.2 + uTime * 0.28 + 1.4) * 0.35 + 0.65;
+float _m  = 0.55 + _w1 * _w2 * 0.9;
+vec3 totalEmissiveRadiance = emissive * _m;`,
+    );
+  };
+  roomMat.customProgramCacheKey = () => 'holm_wall_gradient';
   const room = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 102), roomMat);
   room.position.set(0, 4, -39);
   room.receiveShadow = true;
@@ -51,11 +80,11 @@ export function createScene(canvas, isMobile = false) {
 
   // Zemin — hafif yansımalı
   const floorMat = new THREE.MeshStandardMaterial({
-    color:             0x101018,
-    roughness:         0.9,
-    metalness:         0.05,
-    emissive:          new THREE.Color(0x080e18),
-    emissiveIntensity: 5.0, // zemin çok karanlık kalmasın — ince ayar buradan
+    color:             0x1a1a22, // gri-mavi
+    roughness:         0.88,
+    metalness:         0.08,
+    emissive:          new THREE.Color(0x111118), // gri glow
+    emissiveIntensity: 6.0, // ince ayar buradan
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -111,7 +140,7 @@ export function createScene(canvas, isMobile = false) {
   }
   window.addEventListener("resize", onResize);
 
-  return { scene, renderer, camera, spotLight, armSpot, ambient, hemi, onResize };
+  return { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms, onResize };
 }
 
 // ---------- Projection plane (end wall) ----------
