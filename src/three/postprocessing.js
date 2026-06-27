@@ -28,11 +28,19 @@ const LiquidCursorShader = {
     uniform vec2  uResolution;
     varying vec2  vUv;
 
+    // Low-frequency flowing noise — large slow waves for mercury feel
     float liqNoise(vec2 p) {
-      float a = sin(p.x * 4.3 + uTime * 0.9)  * cos(p.y * 3.7 + uTime * 0.7)  * 0.50;
-      float b = sin(p.x * 7.1 - uTime * 1.3 + p.y * 5.9)                       * 0.30;
-      float c = cos(p.x * 12.0 + p.y * 8.0   + uTime * 1.8)                    * 0.20;
+      float a = sin(p.x * 1.8 + uTime * 0.38) * cos(p.y * 1.5 + uTime * 0.31) * 0.55;
+      float b = sin(p.x * 3.2 - uTime * 0.52 + p.y * 2.7 + 1.3)               * 0.28;
+      float c = cos(p.x * 5.1 + p.y * 3.9    + uTime * 0.74 + 2.7)            * 0.17;
       return a + b + c;
+    }
+
+    // Secondary noise layer offset in space — makes the blob morph asymmetrically
+    float liqNoise2(vec2 p) {
+      float a = sin(p.y * 2.3 + uTime * 0.44 + 1.1) * cos(p.x * 1.9 + uTime * 0.29) * 0.55;
+      float b = cos(p.x * 4.1 + p.y * 2.5    - uTime * 0.61 + 3.5)                   * 0.45;
+      return a + b;
     }
 
     void main() {
@@ -42,31 +50,44 @@ const LiquidCursorShader = {
       vec2  d    = (uv - uMouse) * vec2(aspect, 1.0);
       float dist = length(d);
 
-      float radius  = 0.095 + sin(uTime * 0.65) * 0.004;
-      float noise   = liqNoise(uv * 3.0) * 0.022;
-      float eDist   = dist + noise;
+      // Larger blob that breathes slowly
+      float radius = 0.20 + sin(uTime * 0.42) * 0.012;
+
+      // Two noise layers shift the edge in different directions — organic morphing boundary
+      float n1 = liqNoise(uv * 2.2)  * 0.052;
+      float n2 = liqNoise2(uv * 1.8) * 0.038;
+      float eDist = dist + n1 + n2;
 
       if (eDist < radius) {
         vec2  dir     = (dist > 0.001) ? d / dist : vec2(0.0);
         float falloff = smoothstep(radius, 0.0, eDist);
 
-        // swirl rotation around cursor
-        float swirl = sin(atan(d.y, d.x) * 3.0 + uTime * 1.6) * 0.028;
-        vec2  perp  = vec2(-dir.y, dir.x);
+        // Strong swirl — blob visibly rotates as it flows
+        float angle  = atan(d.y, d.x);
+        float swirl  = sin(angle * 2.0 + uTime * 0.9) * 0.072 * falloff;
+        vec2  perp   = vec2(-dir.y, dir.x);
 
-        // lens push + liquid swirl
-        vec2 disp = dir * (0.13 * falloff) + perp * (swirl * falloff);
-        disp.x /= aspect; // undo aspect on displacement
+        // Internal fluid turbulence (slow rolling waves inside the blob)
+        vec2 turb = vec2(
+          sin(uv.y * 6.0 + uTime * 0.55) * 0.018,
+          cos(uv.x * 5.0 + uTime * 0.48) * 0.018
+        ) * falloff;
 
-        // chromatic split inside blob
-        float r = texture2D(tDiffuse, uv - disp * 1.18).r;
-        float g = texture2D(tDiffuse, uv - disp       ).g;
-        float b = texture2D(tDiffuse, uv - disp * 0.82).b;
+        // Lens push + swirl + internal turbulence
+        vec2 disp = dir * (0.18 * falloff) + perp * swirl + turb;
+        disp.x /= aspect;
 
-        // thin glow ring at edge
-        float ring = smoothstep(radius * 0.76, radius * 0.88, eDist)
-                   - smoothstep(radius * 0.90, radius,        eDist);
-        vec3 col = vec3(r, g, b) + ring * vec3(0.38, 0.52, 1.0) * 0.55;
+        // Chromatic split — wider split toward center (reversed: stronger magnification)
+        float r = texture2D(tDiffuse, uv - disp * 1.22).r;
+        float g = texture2D(tDiffuse, uv - disp        ).g;
+        float b = texture2D(tDiffuse, uv - disp * 0.78 ).b;
+
+        // Animated glow ring — pulses with the noise deformation
+        float ringInner = radius * 0.80 + n1 * 0.5;
+        float ringOuter = radius * 0.96 + n1 * 0.5;
+        float ring = smoothstep(ringInner - 0.008, ringInner + 0.008, eDist)
+                   - smoothstep(ringOuter - 0.006, ringOuter,         eDist);
+        vec3 col = vec3(r, g, b) + ring * vec3(0.35, 0.50, 1.0) * 0.65;
 
         gl_FragColor = vec4(col, 1.0);
       } else {

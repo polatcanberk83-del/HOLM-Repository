@@ -416,8 +416,8 @@ function tick(now = 0) {
   wallUniforms.uTime.value = elapsed;
 
   if (!isMobile && post.liquid) {
-    _sprX += (_tgtX - _sprX) * 0.10;
-    _sprY += (_tgtY - _sprY) * 0.10;
+    _sprX += (_tgtX - _sprX) * 0.055;
+    _sprY += (_tgtY - _sprY) * 0.055;
     post.liquid.uniforms.uMouse.value.set(_sprX, 1.0 - _sprY);
     post.liquid.uniforms.uTime.value = elapsed;
   }
