@@ -66,10 +66,10 @@ export function createScene(canvas, isMobile = false) {
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, 45.0); // ince ayar — orijinal 32
+  const ambient = new THREE.AmbientLight(0x203050, 55.0); // ince ayar — orijinal 32
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 35.0); // ince ayar — orijinal 26
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 42.0); // ince ayar — orijinal 26
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
@@ -81,31 +81,8 @@ export function createScene(canvas, isMobile = false) {
   scene.add(spotLight);
   scene.add(spotLight.target);
 
-  // Her model pozisyonunda sabit dolgu ışığı (Z=0,-12,-24,-36,-48,-60)
-  // Spotlight aktif modeli aydınlatırken diğerleri bu ışıkla siluet verir.
-  // Fill lights on left/right walls so they light the room without blasting models from above
-  // WALL_FILL_DIST: yayılım yarıçapı — sadece bu değeri artırarak lekelerin kenarları birbirine karışır.
-  // Parlaklık (4000) ve decay (2) sabit — odanın karanlığı korunur.
-  const WALL_FILL_DIST = 36; // ince ayar buradan — orijinal 28, şu an 36 (lekelerin kenarları birbirine karışsın)
-  // z=-48 (arm_crystal) kasıtlı olarak dışarıda — karanlıkta başlasın, armSpot açsın
-  (isMobile ? [0, -24] : [0, -12, -24, -36]).forEach(z => {
-    [-8, 8].forEach(x => {
-      const fill = new THREE.PointLight(0x3a5080, 4000, WALL_FILL_DIST, 2);
-      fill.position.set(x, 4, z);
-      scene.add(fill);
-    });
-  });
-
-  // Corridor lights
-  if (!isMobile) {
-    [-58, -68, -78].forEach(z => {
-      [-7, 7].forEach(x => {
-        const c = new THREE.PointLight(0x3a5080, 1800, 22, 2);
-        c.position.set(x, 4, z);
-        scene.add(c);
-      });
-    });
-  }
+  // Fill PointLight'lar kaldırıldı — nokta nokta leke yapıyorlardı.
+  // Oda genel ışığı artık ambient + hemi + WALL_EMISSIVE'den geliyor (homojen).
 
   // arm_crystal reveal spotlight — intensity=0 başlar, main.js kamera yaklaşınca açar
   // ARM_REVEAL_INTENSITY: ince ayar main.js'de

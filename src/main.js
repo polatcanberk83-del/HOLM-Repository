@@ -45,8 +45,8 @@ const diamondCursor = document.getElementById("diamond-cursor");
 const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, onResize } = createScene(canvas, isMobile);
 
 // Base light intensities (must match scene.js) — driven down during gathering effect
-const AMBIENT_INTENSITY_BASE  =  45.0; // scene.js ambient ile senkron
-const HEMI_INTENSITY_BASE     =  35.0; // scene.js hemi ile senkron
+const AMBIENT_INTENSITY_BASE  =  55.0; // scene.js ambient ile senkron
+const HEMI_INTENSITY_BASE     =  42.0; // scene.js hemi ile senkron
 const ARM_REVEAL_INTENSITY    = 200.0; // arm_crystal reveal spot — ince ayar buradan
 const SPOT_INTENSITY_BASE    = 30.0;
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
@@ -459,10 +459,9 @@ function tick(now = 0) {
   spotLight.target.position.lerp(_spotLook, 0.05);
   spotLight.target.updateMatrixWorld();
 
-  // arm_crystal reveal — kamera yaklaştıkça spotlight açılır, uzaklaşınca söner
-  const _armDist = Math.abs(camera.position.z - MODEL_DEFS[MODEL_DEFS.length - 1].z);
-  const _armT    = Math.max(0, 1 - _armDist / (ORBIT_R + 2));
-  armSpot.intensity += (ARM_REVEAL_INTENSITY * _armT - armSpot.intensity) * 0.04;
+  // arm_crystal reveal — orbit'e girildiğinde spotlight açılır, çıkınca söner
+  const _isAtArm = inOrbit && near && near.z === MODEL_DEFS[MODEL_DEFS.length - 1].z;
+  armSpot.intensity += ((_isAtArm ? ARM_REVEAL_INTENSITY : 0) - armSpot.intensity) * 0.04;
 
   // Update DoF focus: distance from camera to nearest model on Z axis
   if (post.bokeh) {
