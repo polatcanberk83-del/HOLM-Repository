@@ -460,8 +460,8 @@ function tick(now = 0) {
   spotLight.target.updateMatrixWorld();
 
   // arm_crystal reveal — orbit'e girildiğinde spotlight açılır, çıkınca söner
-  const _isAtArm = inOrbit && near && near.z === MODEL_DEFS[MODEL_DEFS.length - 1].z;
-  armSpot.intensity += ((_isAtArm ? ARM_REVEAL_INTENSITY : 0) - armSpot.intensity) * 0.04;
+  const _isAtArm = inOrbit && near && near.file.includes('arm_crystal');
+  armSpot.intensity += ((_isAtArm ? ARM_REVEAL_INTENSITY : 0) - armSpot.intensity) * 0.10;
 
   // Update DoF focus: distance from camera to nearest model on Z axis
   if (post.bokeh) {
