@@ -4684,11 +4684,19 @@ void main() {
     uniform vec2  uResolution;
     varying vec2  vUv;
 
+    // Low-frequency flowing noise — large slow waves for mercury feel
     float liqNoise(vec2 p) {
-      float a = sin(p.x * 4.3 + uTime * 0.9)  * cos(p.y * 3.7 + uTime * 0.7)  * 0.50;
-      float b = sin(p.x * 7.1 - uTime * 1.3 + p.y * 5.9)                       * 0.30;
-      float c = cos(p.x * 12.0 + p.y * 8.0   + uTime * 1.8)                    * 0.20;
+      float a = sin(p.x * 1.8 + uTime * 0.38) * cos(p.y * 1.5 + uTime * 0.31) * 0.55;
+      float b = sin(p.x * 3.2 - uTime * 0.52 + p.y * 2.7 + 1.3)               * 0.28;
+      float c = cos(p.x * 5.1 + p.y * 3.9    + uTime * 0.74 + 2.7)            * 0.17;
       return a + b + c;
+    }
+
+    // Secondary noise layer offset in space — makes the blob morph asymmetrically
+    float liqNoise2(vec2 p) {
+      float a = sin(p.y * 2.3 + uTime * 0.44 + 1.1) * cos(p.x * 1.9 + uTime * 0.29) * 0.55;
+      float b = cos(p.x * 4.1 + p.y * 2.5    - uTime * 0.61 + 3.5)                   * 0.45;
+      return a + b;
     }
 
     void main() {
@@ -4698,31 +4706,44 @@ void main() {
       vec2  d    = (uv - uMouse) * vec2(aspect, 1.0);
       float dist = length(d);
 
-      float radius  = 0.095 + sin(uTime * 0.65) * 0.004;
-      float noise   = liqNoise(uv * 3.0) * 0.022;
-      float eDist   = dist + noise;
+      // Larger blob that breathes slowly
+      float radius = 0.20 + sin(uTime * 0.42) * 0.012;
+
+      // Two noise layers shift the edge in different directions — organic morphing boundary
+      float n1 = liqNoise(uv * 2.2)  * 0.052;
+      float n2 = liqNoise2(uv * 1.8) * 0.038;
+      float eDist = dist + n1 + n2;
 
       if (eDist < radius) {
         vec2  dir     = (dist > 0.001) ? d / dist : vec2(0.0);
         float falloff = smoothstep(radius, 0.0, eDist);
 
-        // swirl rotation around cursor
-        float swirl = sin(atan(d.y, d.x) * 3.0 + uTime * 1.6) * 0.028;
-        vec2  perp  = vec2(-dir.y, dir.x);
+        // Strong swirl — blob visibly rotates as it flows
+        float angle  = atan(d.y, d.x);
+        float swirl  = sin(angle * 2.0 + uTime * 0.9) * 0.072 * falloff;
+        vec2  perp   = vec2(-dir.y, dir.x);
 
-        // lens push + liquid swirl
-        vec2 disp = dir * (0.13 * falloff) + perp * (swirl * falloff);
-        disp.x /= aspect; // undo aspect on displacement
+        // Internal fluid turbulence (slow rolling waves inside the blob)
+        vec2 turb = vec2(
+          sin(uv.y * 6.0 + uTime * 0.55) * 0.018,
+          cos(uv.x * 5.0 + uTime * 0.48) * 0.018
+        ) * falloff;
 
-        // chromatic split inside blob
-        float r = texture2D(tDiffuse, uv - disp * 1.18).r;
-        float g = texture2D(tDiffuse, uv - disp       ).g;
-        float b = texture2D(tDiffuse, uv - disp * 0.82).b;
+        // Lens push + swirl + internal turbulence
+        vec2 disp = dir * (0.18 * falloff) + perp * swirl + turb;
+        disp.x /= aspect;
 
-        // thin glow ring at edge
-        float ring = smoothstep(radius * 0.76, radius * 0.88, eDist)
-                   - smoothstep(radius * 0.90, radius,        eDist);
-        vec3 col = vec3(r, g, b) + ring * vec3(0.38, 0.52, 1.0) * 0.55;
+        // Chromatic split — wider split toward center (reversed: stronger magnification)
+        float r = texture2D(tDiffuse, uv - disp * 1.22).r;
+        float g = texture2D(tDiffuse, uv - disp        ).g;
+        float b = texture2D(tDiffuse, uv - disp * 0.78 ).b;
+
+        // Animated glow ring — pulses with the noise deformation
+        float ringInner = radius * 0.80 + n1 * 0.5;
+        float ringOuter = radius * 0.96 + n1 * 0.5;
+        float ring = smoothstep(ringInner - 0.008, ringInner + 0.008, eDist)
+                   - smoothstep(ringOuter - 0.006, ringOuter,         eDist);
+        vec3 col = vec3(r, g, b) + ring * vec3(0.35, 0.50, 1.0) * 0.65;
 
         gl_FragColor = vec4(col, 1.0);
       } else {
@@ -4955,4 +4976,4 @@ uniform float uIntensity;
                float _w = sin(position.x * 4.0 + uTime * 1.3)
                         * sin(position.y * 3.5 + uTime * 0.9)
                         * 0.015 * uIntensity;
-               transformed += normal * _w;`)},n.customProgramCacheKey=()=>`holm_distort`,t.material=n,ty.push({mesh:t,uniforms:r,defZ:e.z})}}),mv.add(n),e.file.includes(`void_figure`)&&Av.setSurface(n),e.file.includes(`hero_canvas`)&&Av.setHeroCanvas(n);let s=new hi(new Ca(.4,.5,.3,32),dy);s.position.set(0,.15,e.z),s.castShadow=s.receiveShadow=!0,mv.add(s);let c=qh();c.position.set(0,.02,e.z),mv.add(c);let l=new Ho(13691135,uy[t]??500,16,2);l.position.set(0,6.5,e.z),mv.add(l),console.log(`[HOLM] ✓ ${e.file} @ z=${e.z}`)}catch(t){console.error(`[HOLM] ✗ ${e.file}`,t)}}var py=!1,my=document.getElementById(`projection-overlay`);function hy(){kv.visible=!0,my.classList.add(`active`),Wh.to(my,{opacity:1,duration:1.2,ease:`power2.out`});let e=my.querySelectorAll(`.proj-line`);Wh.fromTo(e,{opacity:0,y:12},{opacity:1,y:0,duration:1,stagger:.4,delay:.4,ease:`power2.out`}),Wh.fromTo(my.querySelector(`.proj-cta`),{opacity:0,y:8},{opacity:1,y:0,duration:1,delay:2.6,ease:`power2.out`})}function gy(){Wh.to(my,{opacity:0,duration:.5,onComplete:()=>{my.classList.remove(`active`),kv.visible=!1,Wh.set(`.proj-line, .proj-cta`,{opacity:0,y:0})}})}av&&(pv.textContent=`SWIPE TO EXPLORE`);var _y=new m(av?{smoothTouch:!1,touchMultiplier:.65}:{duration:4,smoothWheel:!0,wheelMultiplier:.28,touchMultiplier:1.2,smoothTouch:!1});Wh.ticker.lagSmoothing(0),_y.stop();var vy=!1;_y.on(`scroll`,({scroll:e,limit:t})=>{Hv=t>0?e/t:0,!vy&&e>80&&(vy=!0,Wh.to(pv,{opacity:0,duration:.8,ease:`power2.out`}))});function yy(e=0){requestAnimationFrame(yy),_y.raf(e);let t=ey.getElapsedTime();if(Mv.update(t),!av){Qv.setFromCamera($v,gv);let e=Qv.intersectObjects(ty.map(e=>e.mesh),!1);ny=e.length>0?ty.find(t=>t.mesh===e[0].object)?.defZ??null:null;for(let e of ty){e.uniforms.uTime.value=t;let n=+(e.defZ===ny),r=e.uniforms.uIntensity;r.value+=(n-r.value)*.12,r.value<.001&&(r.value=0)}}av?(Uv+=(Hv-Uv)*.11,Wv.copy(Vv.getPoint(Uv)),gv.position.copy(Wv)):(Wv.copy(Vv.getPoint(Hv)),gv.position.lerp(Wv,.07));let{def:n,dist:r}=Zv(gv.position),i=n&&r<Rv+1.5,a=gv.position.z<-56,o=gv.position.z<-68;if(a)Gv.set(0,4,-89.5),qv.set(0,7,gv.position.z),Jv.set(0,3.5,-89.5),Xv(``),kv.material.uniforms.uTime.value=t,o&&!py&&(py=!0,hy()),!o&&py&&(py=!1,gy());else if(i)Gv.set(0,1.5,n.z),qv.set(0,6,n.z),Jv.set(0,.5,n.z),Xv(n.caption),py&&(py=!1,gy());else{let e=cv.find(e=>e.z<gv.position.z-1);Gv.set(0,1.5,e?e.z:gv.position.z-10),qv.set(0,6,gv.position.z-3),Jv.set(0,.5,gv.position.z-8),r>Rv*3&&Xv(``),py&&(py=!1,gy()),kv.visible=!1}Kv.lerp(Gv,.07),gv.lookAt(Kv),_v.position.lerp(qv,.05),_v.target.position.lerp(Jv,.05),_v.target.updateMatrixWorld();let s=Math.hypot(gv.position.x,gv.position.z-Ev);vv.intensity+=((s<Rv+3?Tv:0)-vv.intensity)*.1,Ov.bokeh&&(Ov.bokeh.uniforms.focus.value=r),Ov.grainVignette&&(Ov.grainVignette.uniforms.uTime.value=t),xv.uTime.value=t,!av&&Ov.liquid&&(Fv+=(Nv-Fv)*.1,Iv+=(Pv-Iv)*.1,Ov.liquid.uniforms.uMouse.value.set(Fv,1-Iv),Ov.liquid.uniforms.uTime.value=t),av||ly(t);let c=av?Uv:Hv;c>=.51&&!jv&&(jv=!0,Av.capture()),c<.46&&(jv=!1);let{bgDark:l,textOpacity:u}=Av.update(c),d=1-l*.92;yv.intensity=Cv*d,bv.intensity=wv*d,_v.intensity=Dv*Math.max(d,.12),dv&&(dv.style.opacity=u),u>.01&&Xv(``),Ov.composer.render(),Mv.active&&(hv.autoClear=!1,hv.clearDepth(),hv.render(Mv.scene,Mv.camera),hv.autoClear=!0)}window.addEventListener(`resize`,()=>{Sv(),Ov.setSize(window.innerWidth,window.innerHeight)});async function by(){let e=Vv.getPoint(0);gv.position.copy(e),gv.position.z+=3,Kv.set(0,1.5,cv[0].z),gv.lookAt(Kv),fv&&(fv.style.opacity=`0`),Mv.init({renderer:hv,composer:Ov.composer,lenis:_y,isMobile:av,onComplete(){Wh.to(gv.position,{z:e.z,duration:2.5,ease:`power2.inOut`}),fv&&Wh.to(fv,{opacity:.85,duration:1.4,delay:1.5,ease:`power2.out`}),Wh.to(uv,{opacity:1,duration:1,delay:2,ease:`power2.out`})}}),Mv.setProgress(.03),requestAnimationFrame(yy);for(let e=0;e<cv.length;e++)await fy(cv[e],e),Mv.setProgress((e+1)/cv.length);av||cy(),Mv.setProgress(1),await new Promise(e=>setTimeout(e,600)),Mv.start();let t=document.querySelector(`.proj-cta`);t&&(t.addEventListener(`mousemove`,e=>{let n=t.getBoundingClientRect(),r=(e.clientX-n.left-n.width*.5)/n.width,i=(e.clientY-n.top-n.height*.5)/n.height;Wh.to(t,{x:r*14,y:i*9,duration:.35,ease:`power2.out`})}),t.addEventListener(`mouseleave`,()=>Wh.to(t,{x:0,y:0,duration:.7,ease:`elastic.out(1, 0.45)`})))}by();
+               transformed += normal * _w;`)},n.customProgramCacheKey=()=>`holm_distort`,t.material=n,ty.push({mesh:t,uniforms:r,defZ:e.z})}}),mv.add(n),e.file.includes(`void_figure`)&&Av.setSurface(n),e.file.includes(`hero_canvas`)&&Av.setHeroCanvas(n);let s=new hi(new Ca(.4,.5,.3,32),dy);s.position.set(0,.15,e.z),s.castShadow=s.receiveShadow=!0,mv.add(s);let c=qh();c.position.set(0,.02,e.z),mv.add(c);let l=new Ho(13691135,uy[t]??500,16,2);l.position.set(0,6.5,e.z),mv.add(l),console.log(`[HOLM] ✓ ${e.file} @ z=${e.z}`)}catch(t){console.error(`[HOLM] ✗ ${e.file}`,t)}}var py=!1,my=document.getElementById(`projection-overlay`);function hy(){kv.visible=!0,my.classList.add(`active`),Wh.to(my,{opacity:1,duration:1.2,ease:`power2.out`});let e=my.querySelectorAll(`.proj-line`);Wh.fromTo(e,{opacity:0,y:12},{opacity:1,y:0,duration:1,stagger:.4,delay:.4,ease:`power2.out`}),Wh.fromTo(my.querySelector(`.proj-cta`),{opacity:0,y:8},{opacity:1,y:0,duration:1,delay:2.6,ease:`power2.out`})}function gy(){Wh.to(my,{opacity:0,duration:.5,onComplete:()=>{my.classList.remove(`active`),kv.visible=!1,Wh.set(`.proj-line, .proj-cta`,{opacity:0,y:0})}})}av&&(pv.textContent=`SWIPE TO EXPLORE`);var _y=new m(av?{smoothTouch:!1,touchMultiplier:.65}:{duration:4,smoothWheel:!0,wheelMultiplier:.28,touchMultiplier:1.2,smoothTouch:!1});Wh.ticker.lagSmoothing(0),_y.stop();var vy=!1;_y.on(`scroll`,({scroll:e,limit:t})=>{Hv=t>0?e/t:0,!vy&&e>80&&(vy=!0,Wh.to(pv,{opacity:0,duration:.8,ease:`power2.out`}))});function yy(e=0){requestAnimationFrame(yy),_y.raf(e);let t=ey.getElapsedTime();if(Mv.update(t),!av){Qv.setFromCamera($v,gv);let e=Qv.intersectObjects(ty.map(e=>e.mesh),!1);ny=e.length>0?ty.find(t=>t.mesh===e[0].object)?.defZ??null:null;for(let e of ty){e.uniforms.uTime.value=t;let n=+(e.defZ===ny),r=e.uniforms.uIntensity;r.value+=(n-r.value)*.12,r.value<.001&&(r.value=0)}}av?(Uv+=(Hv-Uv)*.11,Wv.copy(Vv.getPoint(Uv)),gv.position.copy(Wv)):(Wv.copy(Vv.getPoint(Hv)),gv.position.lerp(Wv,.07));let{def:n,dist:r}=Zv(gv.position),i=n&&r<Rv+1.5,a=gv.position.z<-56,o=gv.position.z<-68;if(a)Gv.set(0,4,-89.5),qv.set(0,7,gv.position.z),Jv.set(0,3.5,-89.5),Xv(``),kv.material.uniforms.uTime.value=t,o&&!py&&(py=!0,hy()),!o&&py&&(py=!1,gy());else if(i)Gv.set(0,1.5,n.z),qv.set(0,6,n.z),Jv.set(0,.5,n.z),Xv(n.caption),py&&(py=!1,gy());else{let e=cv.find(e=>e.z<gv.position.z-1);Gv.set(0,1.5,e?e.z:gv.position.z-10),qv.set(0,6,gv.position.z-3),Jv.set(0,.5,gv.position.z-8),r>Rv*3&&Xv(``),py&&(py=!1,gy()),kv.visible=!1}Kv.lerp(Gv,.07),gv.lookAt(Kv),_v.position.lerp(qv,.05),_v.target.position.lerp(Jv,.05),_v.target.updateMatrixWorld();let s=Math.hypot(gv.position.x,gv.position.z-Ev);vv.intensity+=((s<Rv+3?Tv:0)-vv.intensity)*.1,Ov.bokeh&&(Ov.bokeh.uniforms.focus.value=r),Ov.grainVignette&&(Ov.grainVignette.uniforms.uTime.value=t),xv.uTime.value=t,!av&&Ov.liquid&&(Fv+=(Nv-Fv)*.055,Iv+=(Pv-Iv)*.055,Ov.liquid.uniforms.uMouse.value.set(Fv,1-Iv),Ov.liquid.uniforms.uTime.value=t),av||ly(t);let c=av?Uv:Hv;c>=.51&&!jv&&(jv=!0,Av.capture()),c<.46&&(jv=!1);let{bgDark:l,textOpacity:u}=Av.update(c),d=1-l*.92;yv.intensity=Cv*d,bv.intensity=wv*d,_v.intensity=Dv*Math.max(d,.12),dv&&(dv.style.opacity=u),u>.01&&Xv(``),Ov.composer.render(),Mv.active&&(hv.autoClear=!1,hv.clearDepth(),hv.render(Mv.scene,Mv.camera),hv.autoClear=!0)}window.addEventListener(`resize`,()=>{Sv(),Ov.setSize(window.innerWidth,window.innerHeight)});async function by(){let e=Vv.getPoint(0);gv.position.copy(e),gv.position.z+=3,Kv.set(0,1.5,cv[0].z),gv.lookAt(Kv),fv&&(fv.style.opacity=`0`),Mv.init({renderer:hv,composer:Ov.composer,lenis:_y,isMobile:av,onComplete(){Wh.to(gv.position,{z:e.z,duration:2.5,ease:`power2.inOut`}),fv&&Wh.to(fv,{opacity:.85,duration:1.4,delay:1.5,ease:`power2.out`}),Wh.to(uv,{opacity:1,duration:1,delay:2,ease:`power2.out`})}}),Mv.setProgress(.03),requestAnimationFrame(yy);for(let e=0;e<cv.length;e++)await fy(cv[e],e),Mv.setProgress((e+1)/cv.length);av||cy(),Mv.setProgress(1),await new Promise(e=>setTimeout(e,600)),Mv.start();let t=document.querySelector(`.proj-cta`);t&&(t.addEventListener(`mousemove`,e=>{let n=t.getBoundingClientRect(),r=(e.clientX-n.left-n.width*.5)/n.width,i=(e.clientY-n.top-n.height*.5)/n.height;Wh.to(t,{x:r*14,y:i*9,duration:.35,ease:`power2.out`})}),t.addEventListener(`mouseleave`,()=>Wh.to(t,{x:0,y:0,duration:.7,ease:`elastic.out(1, 0.45)`})))}by();
