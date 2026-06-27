@@ -4706,12 +4706,12 @@ void main() {
       vec2  d    = (uv - uMouse) * vec2(aspect, 1.0);
       float dist = length(d);
 
-      // Larger blob that breathes slowly
-      float radius = 0.20 + sin(uTime * 0.42) * 0.012;
+      // Subtle blob that breathes slowly
+      float radius = 0.12 + sin(uTime * 0.42) * 0.006;
 
       // Two noise layers shift the edge in different directions — organic morphing boundary
-      float n1 = liqNoise(uv * 2.2)  * 0.052;
-      float n2 = liqNoise2(uv * 1.8) * 0.038;
+      float n1 = liqNoise(uv * 2.2)  * 0.030;
+      float n2 = liqNoise2(uv * 1.8) * 0.022;
       float eDist = dist + n1 + n2;
 
       if (eDist < radius) {
@@ -4720,17 +4720,17 @@ void main() {
 
         // Strong swirl — blob visibly rotates as it flows
         float angle  = atan(d.y, d.x);
-        float swirl  = sin(angle * 2.0 + uTime * 0.9) * 0.072 * falloff;
+        float swirl  = sin(angle * 2.0 + uTime * 0.9) * 0.038 * falloff;
         vec2  perp   = vec2(-dir.y, dir.x);
 
         // Internal fluid turbulence (slow rolling waves inside the blob)
         vec2 turb = vec2(
-          sin(uv.y * 6.0 + uTime * 0.55) * 0.018,
-          cos(uv.x * 5.0 + uTime * 0.48) * 0.018
+          sin(uv.y * 6.0 + uTime * 0.55) * 0.010,
+          cos(uv.x * 5.0 + uTime * 0.48) * 0.010
         ) * falloff;
 
         // Lens push + swirl + internal turbulence
-        vec2 disp = dir * (0.18 * falloff) + perp * swirl + turb;
+        vec2 disp = dir * (0.13 * falloff) + perp * swirl + turb;
         disp.x /= aspect;
 
         // Chromatic split — wider split toward center (reversed: stronger magnification)
