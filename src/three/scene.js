@@ -35,7 +35,7 @@ export function createScene(canvas, isMobile = false) {
   // Bloom eşiği (threshold=0.9, exposure=6.5): mavi kanal 0x1c (0.11 linear)
   // × WALL_EMISSIVE × 6.5 ≈ 0.43 — eşiğin çok altında, bloom şişirmez.
   // İnce ayar: bu tek değeri değiştir.
-  const WALL_EMISSIVE = 2.5;   // ince ayar buradan — 0=sönük, 3+ parlak
+  const WALL_EMISSIVE = 8.0;   // ince ayar buradan — 0=sönük, 3+ parlak
   const roomMat = new THREE.MeshStandardMaterial({
     color:             0x1c1c2a,
     roughness:         0.95,
@@ -66,10 +66,10 @@ export function createScene(canvas, isMobile = false) {
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, 32.0);
+  const ambient = new THREE.AmbientLight(0x203050, 45.0); // ince ayar — orijinal 32
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 26.0);
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 35.0); // ince ayar — orijinal 26
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
@@ -87,7 +87,8 @@ export function createScene(canvas, isMobile = false) {
   // WALL_FILL_DIST: yayılım yarıçapı — sadece bu değeri artırarak lekelerin kenarları birbirine karışır.
   // Parlaklık (4000) ve decay (2) sabit — odanın karanlığı korunur.
   const WALL_FILL_DIST = 36; // ince ayar buradan — orijinal 28, şu an 36 (lekelerin kenarları birbirine karışsın)
-  (isMobile ? [0, -24, -48] : [0, -12, -24, -36, -48]).forEach(z => {
+  // z=-48 (arm_crystal) kasıtlı olarak dışarıda — karanlıkta başlasın, armSpot açsın
+  (isMobile ? [0, -24] : [0, -12, -24, -36]).forEach(z => {
     [-8, 8].forEach(x => {
       const fill = new THREE.PointLight(0x3a5080, 4000, WALL_FILL_DIST, 2);
       fill.position.set(x, 4, z);
@@ -106,6 +107,18 @@ export function createScene(canvas, isMobile = false) {
     });
   }
 
+  // arm_crystal reveal spotlight — intensity=0 başlar, main.js kamera yaklaşınca açar
+  // ARM_REVEAL_INTENSITY: ince ayar main.js'de
+  const armSpot = new THREE.SpotLight(0xd0e8ff, 0, 16, 0.42, 0.88, 2);
+  armSpot.position.set(0, 9, -48);
+  armSpot.target.position.set(0, 0, -48);
+  armSpot.castShadow = !isMobile;
+  armSpot.shadow.mapSize.set(isMobile ? 512 : 1024, isMobile ? 512 : 1024);
+  armSpot.shadow.bias = -0.002;
+  armSpot.target.updateMatrixWorld();
+  scene.add(armSpot);
+  scene.add(armSpot.target);
+
   // Warm glow near the projection wall
   const wallGlow = new THREE.PointLight(0x5070b0, 3000, 30, 2);
   wallGlow.position.set(0, 5, -83);
@@ -119,7 +132,7 @@ export function createScene(canvas, isMobile = false) {
   }
   window.addEventListener("resize", onResize);
 
-  return { scene, renderer, camera, spotLight, ambient, hemi, onResize };
+  return { scene, renderer, camera, spotLight, armSpot, ambient, hemi, onResize };
 }
 
 // ---------- Projection plane (end wall) ----------

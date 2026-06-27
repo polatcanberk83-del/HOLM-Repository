@@ -42,11 +42,12 @@ const scrollHintEl = document.getElementById("scroll-hint");
 const diamondCursor = document.getElementById("diamond-cursor");
 
 // ---------- Three.js ----------
-const { scene, renderer, camera, spotLight, ambient, hemi, onResize } = createScene(canvas, isMobile);
+const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, onResize } = createScene(canvas, isMobile);
 
 // Base light intensities (must match scene.js) — driven down during gathering effect
-const AMBIENT_INTENSITY_BASE = 32.0;
-const HEMI_INTENSITY_BASE    = 26.0;
+const AMBIENT_INTENSITY_BASE  =  45.0; // scene.js ambient ile senkron
+const HEMI_INTENSITY_BASE     =  35.0; // scene.js hemi ile senkron
+const ARM_REVEAL_INTENSITY    = 200.0; // arm_crystal reveal spot — ince ayar buradan
 const SPOT_INTENSITY_BASE    = 30.0;
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
@@ -457,6 +458,11 @@ function tick(now = 0) {
   spotLight.position.lerp(_spotPos, 0.05);
   spotLight.target.position.lerp(_spotLook, 0.05);
   spotLight.target.updateMatrixWorld();
+
+  // arm_crystal reveal — kamera yaklaştıkça spotlight açılır, uzaklaşınca söner
+  const _armDist = Math.abs(camera.position.z - MODEL_DEFS[MODEL_DEFS.length - 1].z);
+  const _armT    = Math.max(0, 1 - _armDist / (ORBIT_R + 2));
+  armSpot.intensity += (ARM_REVEAL_INTENSITY * _armT - armSpot.intensity) * 0.04;
 
   // Update DoF focus: distance from camera to nearest model on Z axis
   if (post.bokeh) {
