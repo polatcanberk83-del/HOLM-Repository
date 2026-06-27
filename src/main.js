@@ -526,35 +526,15 @@ async function boot() {
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
   camera.lookAt(_lookNow);
 
-  // Hide wordmark initially for intro animation
+  // Hide wordmark initially — revealed after loading completes
   if (wordmarkEl) wordmarkEl.style.opacity = "0";
 
-  // ---------- SVG draw animation ----------
-  const drawPaths = Array.from(document.querySelectorAll("#holm-draw .dp"));
-  drawPaths.forEach(p => {
-    const len = p.getTotalLength();
-    // Set dash values but keep CSS visibility:hidden — each path reveals only on its own onStart
-    gsap.set(p, { strokeDasharray: len, strokeDashoffset: len });
-  });
-  // Draw each letter sequentially — H is slower for emphasis
-  const drawTl = gsap.timeline();
-  drawPaths.forEach((p, i) => {
-    const dur = i === 0 ? 0.72 : 0.45;
-    drawTl.to(p, {
-      strokeDashoffset: 0,
-      duration: dur,
-      ease: "power2.inOut",
-      onStart: () => { p.style.visibility = "visible"; },
-    }, i === 0 ? 0 : "-=0.05");
-  });
-
-  // Load models concurrently with draw animation
+  // CSS drives the loading animation; wait minimum 2.4s for reveal sequence to complete
   const modelsPromise = loadAllModels();
-
-  // Wait for drawing to complete first (keeps pacing to ~2s total)
-  await drawTl;
-  // Then ensure models are ready (usually done by now on fast connections)
-  await modelsPromise;
+  await Promise.all([
+    modelsPromise,
+    new Promise(r => setTimeout(r, 2400)),
+  ]);
   if (voidFigureModel)  shatter.setSurface(voidFigureModel);
   if (heroCanvasModel)  shatter.setHeroCanvas(heroCanvasModel);
   if (!isMobile) createDustParticles();

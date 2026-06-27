@@ -14,7 +14,7 @@
       html, body {
         background: #08050a;
         overflow-x: hidden;
-        overscroll-behavior-y: none; /* prevent iOS bounce from creating scroll jumps */
+        overscroll-behavior-y: none;
       }
       body { font-family: 'Fraunces', serif; color: #f0e6d8; }
 
@@ -70,18 +70,26 @@
         left: 5vw;
         z-index: 3;
         opacity: 0.85;
-        line-height: 0;
+        display: flex;
+        align-items: baseline;
+        gap: 0.12em;
+        line-height: 1;
       }
-      .wordmark svg {
-        width: 88px;
-        height: auto;
-        display: block;
+      .wm-holm {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-style: normal;
+        font-size: clamp(1.05rem, 1.5vw, 1.35rem);
+        letter-spacing: 0.1em;
+        color: rgba(210, 225, 255, 0.9);
+        line-height: 1;
       }
-
-      #loading-wordmark {
-        display: inline-flex;
-        align-items: center;
-        gap: 0.35em;
+      .wm-dia {
+        font-size: clamp(0.42rem, 0.6vw, 0.56rem);
+        color: rgba(170, 205, 255, 0.62);
+        line-height: 1;
+        position: relative;
+        top: -0.22em;
       }
 
       /* ── Scroll hint ─────────────────────────────────────────────── */
@@ -100,26 +108,174 @@
         pointer-events: none;
       }
 
-      /* ── Loading ─────────────────────────────────────────────────── */
+      /* ── Loading — Awwwards gradient reveal ──────────────────────── */
       .loading-screen {
         position: fixed;
         inset: 0;
-        background: #08050a;
+        background: #06060a;
         z-index: 10;
+        overflow: hidden;
         display: flex;
         align-items: center;
         justify-content: center;
-        transition: opacity 0.9s ease;
+        transition: transform 0.95s cubic-bezier(0.76, 0, 0.24, 1);
       }
-      .loading-screen.hidden { opacity: 0; pointer-events: none; }
+      .loading-screen.hidden {
+        transform: translateY(-100%);
+        pointer-events: none;
+      }
 
-      /* SVG draw logo */
-      #holm-draw {
-        width: clamp(160px, 28vw, 240px);
-        height: auto;
-        filter: drop-shadow(0 0 12px rgba(180, 210, 255, 0.15));
+      /* Gradient orbs */
+      .ld-orb {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(88px);
+        opacity: 0;
+        pointer-events: none;
+        will-change: opacity, transform;
       }
-      #holm-draw .dp { fill: none; visibility: hidden; }
+
+      .ld-orb--a {
+        width: 130vmax; height: 130vmax;
+        left: -35vmax; bottom: -35vmax;
+        background: radial-gradient(circle at 38% 62%,
+          rgba(11, 24, 96, 0.98) 0%,
+          rgba(6, 12, 58, 0.72) 42%,
+          transparent 70%);
+        animation: ld-orb-a 2.8s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
+      }
+
+      .ld-orb--b {
+        width: 88vmax; height: 88vmax;
+        right: -24vmax; top: -24vmax;
+        background: radial-gradient(circle at 62% 38%,
+          rgba(28, 12, 112, 0.84) 0%,
+          rgba(16, 7, 68, 0.52) 45%,
+          transparent 70%);
+        animation: ld-orb-b 2.2s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
+      }
+
+      .ld-orb--c {
+        width: 60vmax; height: 60vmax;
+        left: 50%; top: 50%;
+        background: radial-gradient(circle at center,
+          rgba(30, 62, 210, 0.40) 0%,
+          rgba(18, 38, 148, 0.22) 42%,
+          transparent 70%);
+        animation: ld-orb-c 2.5s cubic-bezier(0.16, 1, 0.3, 1) 0.52s both;
+      }
+
+      @keyframes ld-orb-a {
+        0%   { opacity: 0; transform: scale(0.30) translate(-4%, 5%); }
+        42%  { opacity: 0.70; }
+        100% { opacity: 0.60; transform: scale(1) translate(0, 0); }
+      }
+      @keyframes ld-orb-b {
+        0%   { opacity: 0; transform: scale(0.36); }
+        100% { opacity: 0.50; transform: scale(1); }
+      }
+      @keyframes ld-orb-c {
+        0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.06); }
+        52%  { opacity: 0.48; transform: translate(-50%, -50%) scale(1.14); }
+        100% { opacity: 0.35; transform: translate(-50%, -50%) scale(1); }
+      }
+
+      /* Scan line — drops top → center, tempo-synced with logo reveal */
+      .ld-scan {
+        position: absolute;
+        left: 0; right: 0;
+        height: 1px;
+        background: linear-gradient(90deg,
+          transparent 0%,
+          rgba(78, 132, 255, 0.26) 8%,
+          rgba(138, 188, 255, 0.88) 32%,
+          rgba(208, 232, 255, 1.00) 50%,
+          rgba(138, 188, 255, 0.88) 68%,
+          rgba(78, 132, 255, 0.26) 92%,
+          transparent 100%);
+        box-shadow: 0 0 14px 4px rgba(108, 164, 255, 0.30);
+        top: -2px;
+        opacity: 0;
+        pointer-events: none;
+        animation: ld-scan 1.5s linear 0.26s forwards;
+      }
+
+      @keyframes ld-scan {
+        0%   { top: -2px;  opacity: 0; }
+        4%   { opacity: 1; }
+        86%  { opacity: 0.72; }
+        100% { top: 54vh;  opacity: 0; }
+      }
+
+      /* Secondary subtle sweep — diagonal echo */
+      .ld-sweep {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+        pointer-events: none;
+        background: linear-gradient(
+          108deg,
+          transparent 22%,
+          rgba(44, 82, 210, 0.10) 42%,
+          rgba(88, 138, 255, 0.06) 52%,
+          transparent 68%
+        );
+        background-size: 220% 100%;
+        background-position: -220% 0;
+        animation: ld-sweep 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.52s forwards;
+      }
+
+      @keyframes ld-sweep {
+        0%   { opacity: 0; background-position: -220% 0; }
+        18%  { opacity: 1; }
+        82%  { opacity: 0.65; }
+        100% { opacity: 0; background-position: 120% 0; }
+      }
+
+      /* Logo */
+      .ld-logo {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        align-items: baseline;
+        gap: 0.18em;
+        opacity: 0;
+        will-change: opacity, filter, transform;
+        animation: ld-logo-in 1.05s cubic-bezier(0.16, 1, 0.3, 1) 1.02s both;
+      }
+
+      @keyframes ld-logo-in {
+        0%   { opacity: 0; filter: blur(14px); transform: translateY(10px); }
+        100% { opacity: 1; filter: blur(0px);  transform: translateY(0); }
+      }
+
+      .ld-holm {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-style: normal;
+        font-size: clamp(3.8rem, 9.5vw, 8rem);
+        letter-spacing: 0.1em;
+        line-height: 1;
+        background: linear-gradient(138deg,
+          rgba(145, 185, 255, 0.90) 0%,
+          rgba(205, 226, 255, 1.00) 36%,
+          rgba(175, 212, 255, 0.96) 64%,
+          rgba(128, 170, 255, 0.88) 100%
+        );
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 28px rgba(92, 145, 255, 0.40));
+      }
+
+      .ld-dia {
+        font-family: serif;
+        font-size: clamp(1.4rem, 3.2vw, 2.8rem);
+        color: rgba(145, 198, 255, 0.60);
+        line-height: 1;
+        position: relative;
+        top: -0.06em;
+      }
 
       /* ── Projection overlay ──────────────────────────────────────── */
       #projection-overlay {
@@ -143,7 +299,6 @@
         position: relative;
       }
 
-      /* Radial glow behind text — reinforces "you're reading off the light" */
       .proj-content::before {
         content: '';
         position: absolute;
@@ -168,7 +323,7 @@
       }
       .proj-line.italic { font-style: italic; }
 
-      /* ── CTA button — Awwwards-level ──────────────────────────────── */
+      /* ── CTA button ──────────────────────────────────────────────── */
       .proj-cta {
         display: inline-block;
         margin-top: 2.5rem;
@@ -185,13 +340,11 @@
         opacity: 0;
         cursor: pointer;
         pointer-events: auto;
-        /* transform is driven by JS magnetic — only border/glow transition here */
         transition: border-color 0.5s ease, box-shadow 0.5s ease, color 0.4s ease;
         z-index: 1;
         will-change: transform;
       }
 
-      /* Fill sweep left → right on hover */
       .proj-cta::before {
         content: '';
         position: absolute;
@@ -206,7 +359,6 @@
       }
       .proj-cta:hover::before { transform: scaleX(1); }
 
-      /* Text layers — slide roll on hover */
       .proj-cta-text,
       .proj-cta-text-hover {
         display: block;
@@ -279,7 +431,7 @@
       #crosshair { display: none; }
       #free-hint { display: none; }
 
-      /* ── Book a Call button ─────────────────────────────────────── */
+      /* ── Book a Call button ──────────────────────────────────────── */
       #book-call {
         position: fixed;
         top: 5vh;
@@ -298,7 +450,6 @@
         transition: color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
         white-space: nowrap;
       }
-      /* Left-to-right fill sweep on hover */
       #book-call::before {
         content: '';
         position: absolute;
@@ -327,7 +478,7 @@
         }
       }
 
-      /* ── Tablet (768 – 1024px) ──────────────────────────────────── */
+      /* ── Tablet (768–1024px) ─────────────────────────────────────── */
       @media (max-width: 1024px) and (min-width: 768px) {
         .proj-content { max-width: 420px; }
         .proj-line { font-size: clamp(0.82rem, 1.2vw, 0.98rem); }
@@ -337,9 +488,11 @@
       /* ── Mobile (≤767px) ─────────────────────────────────────────── */
       @media (max-width: 767px) {
         /* Loading */
-        #holm-draw { width: clamp(130px, 55vw, 180px); }
+        .ld-holm { font-size: clamp(2.8rem, 16vw, 4.5rem); }
+        .ld-dia  { font-size: clamp(1.1rem, 6vw, 1.8rem); }
+        .ld-orb  { filter: blur(60px); }
 
-        /* Caption — pushed higher so it breathes above thumb zone */
+        /* Caption */
         .caption-layer { bottom: 14vh; }
         .caption {
           font-size: clamp(0.9rem, 4.8vw, 1.2rem);
@@ -350,7 +503,7 @@
 
         /* Wordmark */
         .wordmark { top: 5vh; left: 5vw; }
-        .wordmark svg { width: 64px; }
+        .wm-holm  { font-size: clamp(0.9rem, 3.8vw, 1.1rem); }
 
         /* Scroll hint */
         .scroll-hint {
@@ -391,7 +544,7 @@
 
       /* ── Small phones (≤375px) ───────────────────────────────────── */
       @media (max-width: 375px) {
-        #loading-wordmark { font-size: 1.5rem; }
+        .ld-holm { font-size: clamp(2.4rem, 18vw, 3.2rem); }
         .caption { font-size: clamp(0.78rem, 4.2vw, 0.95rem); }
         .proj-line { font-size: clamp(0.76rem, 3.8vw, 0.9rem); }
       }
@@ -412,10 +565,9 @@
         text-align: center;
         pointer-events: none;
         z-index: 8;
-        opacity: 0;           /* JS drives this every frame */
+        opacity: 0;
         letter-spacing: 0.01em;
 
-        /* Gradient fill — shimmer sweeps right-to-left on a loop */
         background: linear-gradient(
           105deg,
           rgba(160, 188, 255, 0.88) 0%,
@@ -429,7 +581,6 @@
         background-clip: text;
         -webkit-text-fill-color: transparent;
 
-        /* Outer glow via filter (works on the clipped text shape) */
         filter:
           drop-shadow(0 0  5px rgba(150, 185, 255, 0.90))
           drop-shadow(0 0 18px rgba(110, 155, 255, 0.65))
@@ -472,42 +623,28 @@
     </style>
   </head>
   <body>
+
+    <!-- ── Loading screen ─────────────────────────────────────────── -->
     <div class="loading-screen" id="loading">
-      <!-- SVG paths drawn letter-by-letter on load -->
-      <svg id="holm-draw" viewBox="0 0 252 62" xmlns="http://www.w3.org/2000/svg">
-        <!-- H -->
-        <path class="dp" d="M 2,2 L 2,60 M 2,31 L 42,31 M 42,2 L 42,60"
-              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- O: start top, clockwise → right half → left half -->
-        <path class="dp" d="M 77,2 A 21,29 0 0 1 77,60 A 21,29 0 0 1 77,2"
-              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round"/>
-        <!-- L -->
-        <path class="dp" d="M 112,2 L 112,60 L 150,60"
-              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- M -->
-        <path class="dp" d="M 164,60 L 164,2 L 187,40 L 210,2 L 210,60"
-              stroke="#d0e0f5" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <!-- Diamond -->
-        <path class="dp" d="M 236,14 L 250,31 L 236,48 L 222,31 Z"
-              stroke="#d0e0f5" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <!-- Gradient orbs -->
+      <div class="ld-orb ld-orb--a"></div>
+      <div class="ld-orb ld-orb--b"></div>
+      <div class="ld-orb ld-orb--c"></div>
+      <!-- Diagonal colour sweep -->
+      <div class="ld-sweep"></div>
+      <!-- Scan line — drops from top, triggers logo -->
+      <div class="ld-scan"></div>
+      <!-- Logo: Fraunces 300 non-italic + diamond -->
+      <div class="ld-logo">
+        <span class="ld-holm">HOLM</span><span class="ld-dia">◆</span>
+      </div>
     </div>
 
     <canvas id="scene-canvas"></canvas>
 
+    <!-- ── Corner wordmark ───────────────────────────────────────── -->
     <div class="wordmark">
-      <svg viewBox="0 0 252 62" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <path d="M 2,2 L 2,60 M 2,31 L 42,31 M 42,2 L 42,60"
-              stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M 77,2 A 21,29 0 0 1 77,60 A 21,29 0 0 1 77,2"
-              stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
-        <path d="M 112,2 L 112,60 L 150,60"
-              stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M 164,60 L 164,2 L 187,40 L 210,2 L 210,60"
-              stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-        <path d="M 236,14 L 250,31 L 236,48 L 222,31 Z"
-              stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      <span class="wm-holm">HOLM</span><span class="wm-dia">◆</span>
     </div>
 
     <a id="book-call"
@@ -541,7 +678,7 @@
       </a>
     </div>
 
-    <!-- Gathering sequence typographic moment -->
+    <!-- Gathering sequence -->
     <div id="gathering-text">Gathering the pieces, one by one.</div>
 
     <div id="diamond-cursor">
