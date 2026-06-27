@@ -287,7 +287,7 @@ let heroCanvasModel  = null;
 
 // ---------- Model yükleme ----------
 // Per-model key light intensities — escalating toward model 5
-const MODEL_KEY_INTENSITIES = [180, 300, 460, 680, 1400];
+const MODEL_KEY_INTENSITIES = [155, 255, 390, 580, 1190];
 
 async function loadAllModels() {
   const pedMat = new THREE.MeshStandardMaterial({
