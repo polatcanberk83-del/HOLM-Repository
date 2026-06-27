@@ -98,7 +98,7 @@ export function createScene(canvas, isMobile = false) {
         // Kir/grunge katmanı — statik yüksek frekanslı leke deseni
         float dirt = fbm(vec2(vWorldPos.x * 5.5 + vWorldPos.z * 1.2, vWorldPos.y * 9.0));
         float dirt2 = fbm(vec2(vWorldPos.z * 3.0 + dirt * 0.6, vWorldPos.x * 7.0 + vWorldPos.y * 4.0));
-        col *= (0.84 + dirt * 0.10 + dirt2 * 0.06);
+        col *= (0.93 + dirt * 0.04 + dirt2 * 0.03);
 
         col *= 4.0; // genel parlaklık — ince ayar buradan
         gl_FragColor = vec4(col, 1.0);
@@ -149,8 +149,8 @@ export function createScene(canvas, isMobile = false) {
 
   // arm_crystal reveal spotlight — intensity=0 başlar, main.js kamera yaklaşınca açar
   // ARM_REVEAL_INTENSITY: ince ayar main.js'de
-  const armSpot = new THREE.SpotLight(0xd0e8ff, 0, 16, 0.42, 0.88, 2);
-  armSpot.position.set(0, 9, -48);
+  const armSpot = new THREE.SpotLight(0xd0e8ff, 0, 18, 0.50, 0.85, 2);
+  armSpot.position.set(0, 7, -48);
   armSpot.target.position.set(0, 0, -48);
   armSpot.castShadow = !isMobile;
   armSpot.shadow.mapSize.set(isMobile ? 512 : 1024, isMobile ? 512 : 1024);

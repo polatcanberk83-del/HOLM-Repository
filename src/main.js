@@ -47,7 +47,8 @@ const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms
 // Base light intensities (must match scene.js) — driven down during gathering effect
 const AMBIENT_INTENSITY_BASE  =  75.0; // scene.js ambient ile senkron
 const HEMI_INTENSITY_BASE     =  55.0; // scene.js hemi ile senkron
-const ARM_REVEAL_INTENSITY    = 200.0; // arm_crystal reveal spot — ince ayar buradan
+const ARM_REVEAL_INTENSITY    = 600.0; // arm_crystal reveal spot — ince ayar buradan
+const ARM_CRYSTAL_Z           = -48;   // arm_crystal model z position
 const SPOT_INTENSITY_BASE    = 30.0;
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
@@ -459,8 +460,9 @@ function tick(now = 0) {
   spotLight.target.position.lerp(_spotLook, 0.05);
   spotLight.target.updateMatrixWorld();
 
-  // arm_crystal reveal — orbit'e girildiğinde spotlight açılır, çıkınca söner
-  const _isAtArm = inOrbit && near && near.file.includes('arm_crystal');
+  // arm_crystal reveal — kameraya yaklaşınca spotlight açılır, uzaklaşınca söner
+  const _armDist = Math.hypot(camera.position.x, camera.position.z - ARM_CRYSTAL_Z);
+  const _isAtArm = _armDist < ORBIT_R + 3;
   armSpot.intensity += ((_isAtArm ? ARM_REVEAL_INTENSITY : 0) - armSpot.intensity) * 0.10;
 
   // Update DoF focus: distance from camera to nearest model on Z axis
