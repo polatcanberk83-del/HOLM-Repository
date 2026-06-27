@@ -45,8 +45,8 @@ const diamondCursor = document.getElementById("diamond-cursor");
 const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, onResize } = createScene(canvas, isMobile);
 
 // Base light intensities (must match scene.js) — driven down during gathering effect
-const AMBIENT_INTENSITY_BASE  =  55.0; // scene.js ambient ile senkron
-const HEMI_INTENSITY_BASE     =  42.0; // scene.js hemi ile senkron
+const AMBIENT_INTENSITY_BASE  = 180.0; // scene.js ambient ile senkron
+const HEMI_INTENSITY_BASE     = 130.0; // scene.js hemi ile senkron
 const ARM_REVEAL_INTENSITY    = 200.0; // arm_crystal reveal spot — ince ayar buradan
 const SPOT_INTENSITY_BASE    = 30.0;
 const post      = createPostProcessing(renderer, scene, camera, isMobile);

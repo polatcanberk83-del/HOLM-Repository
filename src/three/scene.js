@@ -51,9 +51,11 @@ export function createScene(canvas, isMobile = false) {
 
   // Zemin — hafif yansımalı
   const floorMat = new THREE.MeshStandardMaterial({
-    color:     0x101018,
-    roughness: 0.9,
-    metalness: 0.05,
+    color:             0x101018,
+    roughness:         0.9,
+    metalness:         0.05,
+    emissive:          new THREE.Color(0x080e18),
+    emissiveIntensity: 1.2, // zemin çok karanlık kalmasın — ince ayar buradan
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -66,10 +68,10 @@ export function createScene(canvas, isMobile = false) {
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, 55.0); // ince ayar — orijinal 32
+  const ambient = new THREE.AmbientLight(0x203050, 180.0); // ince ayar — fill lights gitti, bunu artır
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 42.0); // ince ayar — orijinal 26
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 130.0); // ince ayar — orijinal 26
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
