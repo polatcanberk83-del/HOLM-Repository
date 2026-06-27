@@ -552,7 +552,7 @@ async function boot() {
 
   // Snap to 100% and hold so user sees completion
   _realProgress = 1.0;
-  await new Promise(r => setTimeout(r, 380));
+  await new Promise(r => setTimeout(r, 520));
 
   // Grab loader DOM elements to fade before curtain lifts
   const loaderDomEls = [
@@ -573,7 +573,7 @@ async function boot() {
     },
   })
   .to(loaderDomEls, { opacity: 0, duration: 0.4, ease: "power2.out" })
-  .to(curtain.uniforms.uProgress, { value: 1.0, duration: 1.6, ease: "power3.inOut" }, "-=0.1");
+  .to(curtain.uniforms.uProgress, { value: 1.0, duration: 2.6, ease: "power2.inOut" }, "-=0.1");
 
   // Lazy models load in background after reveal starts
   for (let i = 0; i < LAZY.length; i++) {
