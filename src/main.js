@@ -612,29 +612,63 @@ async function boot() {
   }
 }
 
-// ---------- Loading dissolve — vertical strips collapse from alternating ends ----------
+// ---------- Loading dissolve — gradient tiles shatter in 3D ----------
 function dissolveLoadingScreen() {
-  const N = 10;
-  const strips = [];
-  for (let i = 0; i < N; i++) {
-    const el = document.createElement('div');
-    el.style.cssText =
-      'position:fixed;top:0;height:100%;' +
-      `left:${(i * 10).toFixed(1)}%;width:10.5%;` +
-      'background:#06060a;z-index:100;' +
-      `transform-origin:${i % 2 === 0 ? 'top' : 'bottom'} center;` +
-      'will-change:transform;';
-    document.body.appendChild(el);
-    strips.push(el);
+  const COLS = 14, ROWS = 8;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const tileWPct = 100 / COLS;
+  const tileHPct = 100 / ROWS;
+  const tiles = [];
+
+  // Each tile shows the correct viewport-gradient slice via background-position
+  const gradBg = [
+    'radial-gradient(ellipse 115% 80% at 10% 90%, rgba(7,18,85,0.97) 0%, transparent 50%)',
+    'radial-gradient(ellipse 85% 72% at 90% 10%, rgba(26,8,106,0.84) 0%, transparent 50%)',
+    'radial-gradient(ellipse 55% 55% at 50% 50%, rgba(14,36,148,0.26) 0%, transparent 65%)',
+    '#06060a',
+  ].join(',');
+
+  const container = document.createElement('div');
+  container.style.cssText =
+    'position:fixed;inset:0;z-index:100;perspective:1100px;pointer-events:none;';
+  document.body.appendChild(container);
+
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const el = document.createElement('div');
+      const leftPx = (col / COLS) * vw;
+      const topPx  = (row / ROWS) * vh;
+      el.style.cssText =
+        'position:absolute;' +
+        `left:${(col * tileWPct).toFixed(3)}%;` +
+        `top:${(row * tileHPct).toFixed(3)}%;` +
+        `width:${(tileWPct + 0.3).toFixed(3)}%;` +
+        `height:${(tileHPct + 0.3).toFixed(3)}%;` +
+        `background:${gradBg};` +
+        `background-size:${vw}px ${vh}px;` +
+        `background-position:${(-leftPx).toFixed(1)}px ${(-topPx).toFixed(1)}px;` +
+        'will-change:transform,opacity;';
+      container.appendChild(el);
+      tiles.push(el);
+    }
   }
-  // Hide the loading DOM immediately — strips cover the screen
+
+  // Hide loading DOM — tiles now show identical visual
   loadingEl.style.display = 'none';
-  gsap.to(strips, {
-    scaleY: 0,
-    duration: 0.55,
-    stagger: { each: 0.055, from: 'random' },
-    ease: 'power3.inOut',
-    onComplete: () => strips.forEach(el => el.remove()),
+
+  gsap.to(tiles, {
+    x:         () => (Math.random() - 0.5) * vw * 1.8,
+    y:         () => (Math.random() - 0.5) * vh * 1.8,
+    rotationX: () => (Math.random() - 0.5) * 440,
+    rotationY: () => (Math.random() - 0.5) * 440,
+    rotationZ: () => (Math.random() - 0.5) * 180,
+    scale:     0,
+    opacity:   0,
+    duration:  0.7,
+    stagger:   { each: 0.007, from: 'random' },
+    ease:      'power2.in',
+    onComplete: () => container.remove(),
   });
 }
 
