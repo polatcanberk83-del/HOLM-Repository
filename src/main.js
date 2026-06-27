@@ -387,8 +387,6 @@ function hideProjection() {
 // ---------- Lenis ----------
 if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
 const lenis = new Lenis(isMobile ? {
-  // smoothTouch: false — let native iOS/Android momentum handle touch
-  // Lenis still fires scroll events so splineT stays in sync
   smoothTouch:     false,
   touchMultiplier: 0.65,
 } : {
@@ -398,7 +396,6 @@ const lenis = new Lenis(isMobile ? {
   touchMultiplier: 1.2,
   smoothTouch:     false,
 });
-// Prevent GSAP from stretching time after a dropped frame
 gsap.ticker.lagSmoothing(0);
 
 let _scrollHintHidden = false;
@@ -409,7 +406,6 @@ lenis.on("scroll", ({ scroll, limit }) => {
     gsap.to(scrollHintEl, { opacity: 0, duration: 0.8, ease: "power2.out" });
   }
 });
-// Lenis is driven from tick() — no standalone RAF loop here
 
 // ---------- Render döngüsü ----------
 let _lastTick = 0;
@@ -417,12 +413,10 @@ function tick(now = 0) {
   requestAnimationFrame(tick);
   _lastTick = now;
 
-  // Drive Lenis first so splineT is updated before camera reads it (single-loop, no desync)
   lenis.raf(now);
 
   const elapsed = clock.getElapsedTime();
 
-  // Hover raycast + distortion — desktop only
   if (!isMobile) {
     raycaster.setFromCamera(pointer, camera);
     const hits = raycaster.intersectObjects(distortItems.map(d => d.mesh), false);
@@ -438,9 +432,6 @@ function tick(now = 0) {
     }
   }
 
-  // Camera spline
-  // Mobile: lerp T itself so camera stays on the curve — no straight-line shortcuts through models
-  // Desktop: lerp 3D position for the gentle float effect
   if (isMobile) {
     splineTSmooth += (splineT - splineTSmooth) * 0.11;
     _camTarget.copy(camPath.getPoint(splineTSmooth));
@@ -452,7 +443,6 @@ function tick(now = 0) {
 
   const { def: near, dist } = findNearest(camera.position);
   const inOrbit      = near && dist < ORBIT_R + 1.5;
-  // Corridor zone: camera turns to face wall; overlay fires later when closer
   const inCorridor   = camera.position.z < -56;
   const inProjection = camera.position.z < -68;
 
@@ -487,31 +477,25 @@ function tick(now = 0) {
   spotLight.target.position.lerp(_spotLook, 0.05);
   spotLight.target.updateMatrixWorld();
 
-  // arm_crystal reveal — kameraya yaklaşınca spotlight açılır, uzaklaşınca söner
   const _armDist = Math.hypot(camera.position.x, camera.position.z - ARM_CRYSTAL_Z);
   const _isAtArm = _armDist < ORBIT_R + 3;
   armSpot.intensity += ((_isAtArm ? ARM_REVEAL_INTENSITY : 0) - armSpot.intensity) * 0.10;
 
-  // Update DoF focus: distance from camera to nearest model on Z axis
   if (post.bokeh) {
     post.bokeh.uniforms["focus"].value = dist;
   }
 
-  // Update film grain time
   if (post.grainVignette) {
     post.grainVignette.uniforms.uTime.value = elapsed;
   }
   wallUniforms.uTime.value = elapsed;
 
-  // Animate dust particles — desktop only
   if (!isMobile) animateDust(elapsed);
 
-  // Diamond cursor — model hover state
   if (!isMobile && diamondCursor) {
     diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
   }
 
-  // ── Shatter transition (hero_canvas → void_figure) ────────────────────────
   const effectT = isMobile ? splineTSmooth : splineT;
   if (effectT >= SHATTER_T_ENTER && !_shatterCaptured) {
     _shatterCaptured = true;
@@ -521,17 +505,13 @@ function tick(now = 0) {
 
   const { bgDark, textOpacity } = shatter.update(effectT);
 
-  // Background dimming: only ambient+hemi+spot fade; cubes use MeshBasicMaterial
-  // so they stay at captured-texture brightness regardless of scene light levels.
   const brightF = 1 - bgDark * 0.92;
   ambient.intensity   = AMBIENT_INTENSITY_BASE  * brightF;
   hemi.intensity      = HEMI_INTENSITY_BASE     * brightF;
   spotLight.intensity = SPOT_INTENSITY_BASE     * Math.max(brightF, 0.12);
 
-  // Gathering text DOM element
   if (gatheringTextEl) gatheringTextEl.style.opacity = textOpacity;
 
-  // Suppress model caption while the gathering sequence is active
   if (textOpacity > 0.01) showCaption("");
 
   post.composer.render();
@@ -547,16 +527,13 @@ window.addEventListener("resize", () => {
 async function boot() {
   const p0 = camPath.getPoint(0);
 
-  // Intro: start camera pushed back 3 units further on Z
   camera.position.copy(p0);
   camera.position.z += 3;
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
   camera.lookAt(_lookNow);
 
-  // Hide wordmark initially — revealed after loading completes
   if (wordmarkEl) wordmarkEl.style.opacity = "0";
 
-  // CSS drives the loading animation; wait minimum 1.8s for reveal sequence to complete
   const modelsPromise = loadAllModels();
   await Promise.all([
     modelsPromise,
@@ -566,7 +543,6 @@ async function boot() {
   if (heroCanvasModel)  shatter.setHeroCanvas(heroCanvasModel);
   if (!isMobile) createDustParticles();
 
-  // Brief buffer for GPU shader compilation
   await new Promise(r => setTimeout(r, 200));
 
   // Snap progress bar to 100% and hold so user sees completion
@@ -577,22 +553,16 @@ async function boot() {
   }
   await new Promise(r => setTimeout(r, 300));
 
-  // Start render loop first — 3D scene must be live before dissolve reveals it
   requestAnimationFrame(tick);
-
-  // Intro camera push
   gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
 
-  // Strips collapse from alternating ends, revealing the 3D scene beneath
   dissolveLoadingScreen();
 
-  // Wordmark + caption after dissolve settles (~1.0s)
   if (wordmarkEl) {
-    gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 0.9, ease: "power2.out" });
+    gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 1.8, ease: "power2.out" });
   }
-  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 1.2, ease: "power2.out" });
+  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 2.1, ease: "power2.out" });
 
-  // Magnetic CTA — elastic snap-back on leave
   const ctaBtn = document.querySelector(".proj-cta");
   if (ctaBtn) {
     ctaBtn.addEventListener("mousemove", e => {
@@ -612,64 +582,159 @@ async function boot() {
   }
 }
 
-// ---------- Loading dissolve — gradient tiles shatter in 3D ----------
+// ---------- Loading dissolve — glass crack lines then 3D shard scatter ----------
 function dissolveLoadingScreen() {
-  const COLS = 14, ROWS = 8;
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const tileWPct = 100 / COLS;
-  const tileHPct = 100 / ROWS;
-  const tiles = [];
+  const cx = vw / 2, cy = vh / 2;
 
-  // Each tile shows the correct viewport-gradient slice via background-position
-  const gradBg = [
-    'radial-gradient(ellipse 115% 80% at 10% 90%, rgba(7,18,85,0.97) 0%, transparent 50%)',
-    'radial-gradient(ellipse 85% 72% at 90% 10%, rgba(26,8,106,0.84) 0%, transparent 50%)',
-    'radial-gradient(ellipse 55% 55% at 50% 50%, rgba(14,36,148,0.26) 0%, transparent 65%)',
-    '#06060a',
-  ].join(',');
+  // ── Build crack segment tree ──────────────────────────────────────
+  const segs = [];
+  const N_ARMS = 9;
+  const reach  = Math.hypot(vw, vh) * 0.62;
 
-  const container = document.createElement('div');
-  container.style.cssText =
-    'position:fixed;inset:0;z-index:100;perspective:1100px;pointer-events:none;';
-  document.body.appendChild(container);
-
-  for (let row = 0; row < ROWS; row++) {
-    for (let col = 0; col < COLS; col++) {
-      const el = document.createElement('div');
-      const leftPx = (col / COLS) * vw;
-      const topPx  = (row / ROWS) * vh;
-      el.style.cssText =
-        'position:absolute;' +
-        `left:${(col * tileWPct).toFixed(3)}%;` +
-        `top:${(row * tileHPct).toFixed(3)}%;` +
-        `width:${(tileWPct + 0.3).toFixed(3)}%;` +
-        `height:${(tileHPct + 0.3).toFixed(3)}%;` +
-        `background:${gradBg};` +
-        `background-size:${vw}px ${vh}px;` +
-        `background-position:${(-leftPx).toFixed(1)}px ${(-topPx).toFixed(1)}px;` +
-        'will-change:transform,opacity;';
-      container.appendChild(el);
-      tiles.push(el);
+  function addArm(x, y, angle, remaining, depth) {
+    if (remaining < 10 || depth < 0) return;
+    const segLen = remaining * (0.28 + Math.random() * 0.22);
+    angle += (Math.random() - 0.5) * 0.38;
+    const ex = x + Math.cos(angle) * segLen;
+    const ey = y + Math.sin(angle) * segLen;
+    segs.push({ x1: x, y1: y, x2: ex, y2: ey, d: Math.hypot(x - cx, y - cy) });
+    addArm(ex, ey, angle, remaining - segLen, depth - 1);
+    if (depth >= 2 && Math.random() > 0.45) {
+      const bAngle = angle + (Math.random() > 0.5 ? 1 : -1) * (0.55 + Math.random() * 0.7);
+      addArm(ex, ey, bAngle, (remaining - segLen) * 0.55, depth - 2);
     }
   }
+  for (let i = 0; i < N_ARMS; i++) {
+    const a = (i / N_ARMS) * Math.PI * 2 + (Math.random() - 0.5) * 0.28;
+    addArm(cx, cy, a, reach, 5);
+  }
+  segs.sort((a, b) => a.d - b.d); // draw nearest-to-center first
 
-  // Hide loading DOM — tiles now show identical visual
-  loadingEl.style.display = 'none';
+  // ── Canvas overlay for crack animation ───────────────────────────
+  const crackCv = document.createElement('canvas');
+  crackCv.width  = vw;
+  crackCv.height = vh;
+  crackCv.style.cssText = 'position:fixed;inset:0;z-index:101;pointer-events:none;';
+  document.body.appendChild(crackCv);
+  const ctx = crackCv.getContext('2d');
 
-  gsap.to(tiles, {
-    x:         () => (Math.random() - 0.5) * vw * 2.0,
-    y:         () => (Math.random() - 0.5) * vh * 2.0,
-    rotationX: () => (Math.random() - 0.5) * 480,
-    rotationY: () => (Math.random() - 0.5) * 480,
-    rotationZ: () => (Math.random() - 0.5) * 220,
-    scale:     0,
-    opacity:   0,
-    duration:  1.1,
-    stagger:   { each: 0.012, from: 'random' },
-    ease:      'power2.inOut',
-    onComplete: () => container.remove(),
-  });
+  function setupCtx() {
+    ctx.strokeStyle = 'rgba(205, 232, 255, 0.90)';
+    ctx.lineWidth   = 1.4;
+    ctx.lineJoin    = 'round';
+    ctx.shadowColor = 'rgba(140, 200, 255, 1.0)';
+    ctx.shadowBlur  = 8;
+  }
+  setupCtx();
+
+  // Impact dot
+  ctx.beginPath();
+  ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(210, 238, 255, 0.95)';
+  ctx.shadowBlur = 22; ctx.fill(); ctx.shadowBlur = 8;
+
+  // ── Animate crack growth ──────────────────────────────────────────
+  const CRACK_MS = 460;
+  const t0 = performance.now();
+
+  function drawCracks(now) {
+    const t  = Math.min((now - t0) / CRACK_MS, 1);
+    const tE = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2; // easeInOutQuad
+
+    ctx.clearRect(0, 0, vw, vh);
+    setupCtx();
+
+    // Redraw impact dot
+    ctx.beginPath(); ctx.arc(cx, cy, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(210, 238, 255, 0.95)';
+    ctx.shadowBlur = 22; ctx.fill(); ctx.shadowBlur = 8;
+
+    const total = segs.length;
+    const showN = Math.floor(tE * total);
+    for (let i = 0; i < showN; i++) {
+      const s = segs[i];
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1); ctx.lineTo(s.x2, s.y2); ctx.stroke();
+    }
+    // Partial last segment
+    if (showN < total) {
+      const frac = tE * total - showN;
+      const s = segs[showN];
+      ctx.beginPath(); ctx.moveTo(s.x1, s.y1);
+      ctx.lineTo(s.x1 + (s.x2 - s.x1) * frac, s.y1 + (s.y2 - s.y1) * frac);
+      ctx.stroke();
+    }
+
+    if (t < 1) requestAnimationFrame(drawCracks);
+    else        setTimeout(shatterTiles, 240); // hold cracks visible then shatter
+  }
+  requestAnimationFrame(drawCracks);
+
+  // ── Phase 2: shatter into gradient shards ────────────────────────
+  function shatterTiles() {
+    const COLS = 14, ROWS = 8;
+    const wPct = 100 / COLS;
+    const hPct = 100 / ROWS;
+    const tiles = [];
+
+    const gradBg = [
+      'radial-gradient(ellipse 115% 80% at 10% 90%, rgba(7,18,85,0.97) 0%, transparent 50%)',
+      'radial-gradient(ellipse 85% 72% at 90% 10%, rgba(26,8,106,0.84) 0%, transparent 50%)',
+      'radial-gradient(ellipse 55% 55% at 50% 50%, rgba(14,36,148,0.26) 0%, transparent 65%)',
+      '#06060a',
+    ].join(',');
+
+    const container = document.createElement('div');
+    container.style.cssText =
+      'position:fixed;inset:0;z-index:100;perspective:1200px;pointer-events:none;';
+    document.body.appendChild(container);
+
+    const J = () => (Math.random() - 0.5) * 18; // corner jitter % — irregular shard edges
+
+    for (let row = 0; row < ROWS; row++) {
+      for (let col = 0; col < COLS; col++) {
+        const el     = document.createElement('div');
+        const leftPx = (col / COLS) * vw;
+        const topPx  = (row / ROWS) * vh;
+        const tl = `${J()}% ${J()}%`;
+        const tr = `${100 + J()}% ${J()}%`;
+        const br = `${100 + J()}% ${100 + J()}%`;
+        const bl = `${J()}% ${100 + J()}%`;
+        el.style.cssText =
+          'position:absolute;' +
+          `left:${(col * wPct).toFixed(3)}%;top:${(row * hPct).toFixed(3)}%;` +
+          `width:${(wPct + 0.4).toFixed(3)}%;height:${(hPct + 0.4).toFixed(3)}%;` +
+          `clip-path:polygon(${tl},${tr},${br},${bl});` +
+          `background:${gradBg};` +
+          `background-size:${vw}px ${vh}px;` +
+          `background-position:${(-leftPx).toFixed(1)}px ${(-topPx).toFixed(1)}px;` +
+          'will-change:transform,opacity;';
+        container.appendChild(el);
+        tiles.push(el);
+      }
+    }
+
+    // Hide loading screen — tiles show the same visual
+    loadingEl.style.display = 'none';
+    // Fade crack lines out as pieces start moving
+    gsap.to(crackCv, { opacity: 0, duration: 0.45, onComplete: () => crackCv.remove() });
+
+    // Shatter from center outward — matches glass-break physics
+    gsap.to(tiles, {
+      x:         () => (Math.random() - 0.5) * vw * 2.2,
+      y:         () => (Math.random() - 0.5) * vh * 2.2,
+      rotationX: () => (Math.random() - 0.5) * 520,
+      rotationY: () => (Math.random() - 0.5) * 520,
+      rotationZ: () => (Math.random() - 0.5) * 240,
+      scale:     () => 0.02 + Math.random() * 0.10,
+      opacity:   0,
+      duration:  1.15,
+      stagger:   { each: 0.011, from: 'center', grid: [ROWS, COLS] },
+      ease:      'power3.in',
+      onComplete: () => container.remove(),
+    });
+  }
 }
 
 boot();
