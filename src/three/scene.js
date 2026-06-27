@@ -35,7 +35,7 @@ export function createScene(canvas, isMobile = false) {
   // Bloom eşiği (threshold=0.9, exposure=6.5): mavi kanal 0x1c (0.11 linear)
   // × WALL_EMISSIVE × 6.5 ≈ 0.43 — eşiğin çok altında, bloom şişirmez.
   // İnce ayar: bu tek değeri değiştir.
-  const WALL_EMISSIVE = 8.0;   // ince ayar buradan — 0=sönük, 3+ parlak
+  const WALL_EMISSIVE = 20.0;  // ince ayar buradan — modeli etkilemez, sadece duvar yüzeyi
   const roomMat = new THREE.MeshStandardMaterial({
     color:             0x1c1c2a,
     roughness:         0.95,
@@ -55,7 +55,7 @@ export function createScene(canvas, isMobile = false) {
     roughness:         0.9,
     metalness:         0.05,
     emissive:          new THREE.Color(0x080e18),
-    emissiveIntensity: 1.2, // zemin çok karanlık kalmasın — ince ayar buradan
+    emissiveIntensity: 5.0, // zemin çok karanlık kalmasın — ince ayar buradan
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -68,10 +68,10 @@ export function createScene(canvas, isMobile = false) {
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, 180.0); // ince ayar — fill lights gitti, bunu artır
+  const ambient = new THREE.AmbientLight(0x203050, 55.0);  // ince ayar — modellere vuran taban ışık
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 130.0); // ince ayar — orijinal 26
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 40.0); // ince ayar — orijinal 26
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
