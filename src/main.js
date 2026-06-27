@@ -47,7 +47,7 @@ const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms
 // Base light intensities (must match scene.js) — driven down during gathering effect
 const AMBIENT_INTENSITY_BASE  =  75.0; // scene.js ambient ile senkron
 const HEMI_INTENSITY_BASE     =  55.0; // scene.js hemi ile senkron
-const ARM_REVEAL_INTENSITY    = 600.0; // arm_crystal reveal spot — ince ayar buradan
+const ARM_REVEAL_INTENSITY    = 900.0; // arm_crystal reveal spot — ince ayar buradan
 const ARM_CRYSTAL_Z           = -48;   // arm_crystal model z position
 const SPOT_INTENSITY_BASE    = 30.0;
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
