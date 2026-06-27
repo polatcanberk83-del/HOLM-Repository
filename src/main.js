@@ -286,11 +286,15 @@ let voidFigureModel  = null;
 let heroCanvasModel  = null;
 
 // ---------- Model yükleme ----------
+// Per-model key light intensities — escalating toward model 5
+const MODEL_KEY_INTENSITIES = [420, 720, 1050, 1550, 3200];
+
 async function loadAllModels() {
   const pedMat = new THREE.MeshStandardMaterial({
     color: 0x0d0d0f, roughness: 0.9, metalness: 0.1,
   });
 
+  let modelIdx = 0;
   for (const def of MODEL_DEFS) {
     try {
       const model = await loadModel(def.file);
@@ -350,6 +354,12 @@ async function loadAllModels() {
       halo.position.set(0, 0.02, def.z);
       scene.add(halo);
 
+      // Per-model overhead key light — intensity escalates toward model 5
+      const keyLight = new THREE.PointLight(0xd0e8ff, MODEL_KEY_INTENSITIES[modelIdx] ?? 500, 16, 2);
+      keyLight.position.set(0, 6.5, def.z);
+      scene.add(keyLight);
+
+      modelIdx++;
       console.log(`[HOLM] ✓ ${def.file} @ z=${def.z}`);
     } catch (err) {
       console.error(`[HOLM] ✗ ${def.file}`, err);
