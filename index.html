@@ -194,57 +194,68 @@
         margin-left: 0.16em;
       }
 
-      /* Loading content column */
+      /* Loading content column — only logo now */
       .ld-content {
         position: relative;
         z-index: 2;
         display: flex;
         flex-direction: column;
         align-items: center;
-        gap: 2.4rem;
       }
 
-      /* Progress bar */
+      /* Progress bar — pinned to bottom, 80% wide */
       .ld-bar-wrap {
+        position: absolute;
+        bottom: 8vh;
+        left: 10%;
+        width: 80%;
         display: flex;
         align-items: center;
-        gap: 0.9em;
-        width: clamp(220px, 36vw, 480px);
+        gap: 1.1em;
+        z-index: 2;
         opacity: 0;
-        animation: ld-bar-appear 0.6s ease 0.9s both;
+        animation: ld-bar-appear 0.7s ease 0.85s both;
       }
       @keyframes ld-bar-appear {
-        from { opacity: 0; transform: translateY(6px); }
+        from { opacity: 0; transform: translateY(8px); }
         to   { opacity: 1; transform: translateY(0);   }
       }
       .ld-bar-track {
         flex: 1;
-        height: 1px;
-        background: rgba(100, 140, 255, 0.15);
+        height: 4px;
+        background: rgba(80, 120, 255, 0.12);
         position: relative;
         overflow: visible;
+        border-radius: 2px;
       }
       .ld-bar-fill {
         position: absolute;
         top: 0; left: 0; bottom: 0;
         width: 0%;
+        border-radius: 2px;
         background: linear-gradient(90deg,
-          hsl(232, 100%, 62%),
-          hsl(210, 100%, 76%),
-          hsl(198, 95%, 88%)
+          hsl(232, 100%, 55%)  0%,
+          hsl(215, 100%, 70%) 55%,
+          hsl(200, 100%, 90%) 88%,
+          rgba(230, 246, 255, 1.0) 100%
         );
         box-shadow:
-          0 0  5px rgba(120, 170, 255, 0.95),
-          0 0 14px rgba(80,  140, 255, 0.65),
-          0 0 32px rgba(60,  110, 255, 0.35);
+          0 0  8px rgba(160, 205, 255, 1.00),
+          0 0 22px rgba(100, 160, 255, 0.95),
+          0 0 55px rgba(70,  130, 255, 0.75),
+          0 0 110px rgba(50, 100, 245, 0.45);
       }
       .ld-pct {
         font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 0.58rem;
-        letter-spacing: 0.10em;
-        color: rgba(140, 180, 255, 0.70);
-        min-width: 2.8em;
+        font-size: 0.80rem;
+        font-weight: 300;
+        letter-spacing: 0.12em;
+        color: rgba(170, 210, 255, 0.92);
+        min-width: 3.4em;
         text-align: right;
+        text-shadow:
+          0 0 10px rgba(130, 185, 255, 0.85),
+          0 0 28px rgba(90,  150, 255, 0.45);
       }
 
       /* ── Projection overlay ──────────────────────────────────────── */
@@ -459,7 +470,7 @@
       @media (max-width: 767px) {
         /* Loading */
         .ld-c { font-size: clamp(2.8rem, 14vw, 4.5rem); }
-        .ld-bar-wrap { width: clamp(180px, 70vw, 320px); }
+        .ld-bar-wrap { left: 5%; width: 90%; bottom: 6vh; }
 
         /* Caption */
         .caption-layer { bottom: 14vh; }
@@ -604,12 +615,12 @@
           <span class="ld-c">M</span>
           <span class="ld-c ld-c--dia">◆</span>
         </div>
-        <div class="ld-bar-wrap">
-          <div class="ld-bar-track">
-            <div class="ld-bar-fill" id="ld-fill"></div>
-          </div>
-          <span class="ld-pct" id="ld-percent">0%</span>
+      </div>
+      <div class="ld-bar-wrap">
+        <div class="ld-bar-track">
+          <div class="ld-bar-fill" id="ld-fill"></div>
         </div>
+        <span class="ld-pct" id="ld-percent">0%</span>
       </div>
     </div>
 

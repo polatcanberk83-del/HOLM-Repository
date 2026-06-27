@@ -658,16 +658,16 @@ function dissolveLoadingScreen() {
   loadingEl.style.display = 'none';
 
   gsap.to(tiles, {
-    x:         () => (Math.random() - 0.5) * vw * 1.8,
-    y:         () => (Math.random() - 0.5) * vh * 1.8,
-    rotationX: () => (Math.random() - 0.5) * 440,
-    rotationY: () => (Math.random() - 0.5) * 440,
-    rotationZ: () => (Math.random() - 0.5) * 180,
+    x:         () => (Math.random() - 0.5) * vw * 2.0,
+    y:         () => (Math.random() - 0.5) * vh * 2.0,
+    rotationX: () => (Math.random() - 0.5) * 480,
+    rotationY: () => (Math.random() - 0.5) * 480,
+    rotationZ: () => (Math.random() - 0.5) * 220,
     scale:     0,
     opacity:   0,
-    duration:  0.7,
-    stagger:   { each: 0.007, from: 'random' },
-    ease:      'power2.in',
+    duration:  1.1,
+    stagger:   { each: 0.012, from: 'random' },
+    ease:      'power2.inOut',
     onComplete: () => container.remove(),
   });
 }
