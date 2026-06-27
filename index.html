@@ -108,99 +108,45 @@
         pointer-events: none;
       }
 
-      /* ── Loading — split-letter reveal ──────────────────────────── */
+      /* ── Loading — WebGL curtain (canvas) + DOM overlay ────────── */
       .loading-screen {
         position: fixed;
         inset: 0;
-        background: #06060a;
+        background: transparent; /* WebGL curtain renders in canvas below */
         z-index: 10;
-        overflow: hidden;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-      }
-      .loading-screen.hidden {
-        display: none;
-        pointer-events: none;
-      }
-
-      /* Atmospheric gradient backdrop */
-      .ld-bg {
-        position: absolute;
-        inset: 0;
-        background:
-          radial-gradient(ellipse 115% 80% at 10% 90%,
-            rgba(7, 18, 85, 0.97) 0%, transparent 50%),
-          radial-gradient(ellipse 85% 72% at 90% 10%,
-            rgba(26, 8, 106, 0.84) 0%, transparent 50%),
-          radial-gradient(ellipse 55% 55% at 50% 50%,
-            rgba(14, 36, 148, 0.26) 0%, transparent 65%);
-        animation: ld-bg-appear 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-      }
-      @keyframes ld-bg-appear {
-        from { opacity: 0; transform: scale(1.08); }
-        to   { opacity: 1; transform: scale(1.00); }
-      }
-
-      /* Logo container — glow lives here */
-      .ld-logo {
-        position: relative;
-        z-index: 2;
-        display: flex;
-        align-items: center;
-        gap: 0.01em;
-        filter:
-          drop-shadow(0 0 20px rgba(80, 145, 255, 0.58))
-          drop-shadow(0 0 64px rgba(54, 106, 255, 0.20));
-      }
-
-      /* Each letter — aurora gradient, GSAP controls opacity/y */
-      .ld-c {
-        display: inline-block;
-        font-family: 'Fraunces', serif;
-        font-weight: 300;
-        font-style: normal;
-        font-size: clamp(4rem, 9.5vw, 8.5rem);
-        letter-spacing: -0.01em;
-        line-height: 1;
-        opacity: 0;
-
-        background: linear-gradient(108deg,
-          hsl(232, 100%, 62%) 0%,
-          hsl(215, 100%, 71%) 18%,
-          hsl(202, 95%, 82%) 34%,
-          hsl(208, 100%, 94%) 50%,
-          hsl(200, 88%, 81%) 66%,
-          hsl(220, 100%, 69%) 82%,
-          hsl(244, 90%, 59%) 100%
-        );
-        background-size: 400% 100%;
-        -webkit-background-clip: text;
-        background-clip: text;
-        -webkit-text-fill-color: transparent;
-
-        animation: ld-aurora 3.5s ease-in-out 0.3s infinite alternate;
-        will-change: transform, opacity, filter;
-      }
-
-      /* Aurora shift — same phase on all letters = unified gradient feel */
-      @keyframes ld-aurora {
-        from { background-position: 0%   50%; }
-        to   { background-position: 100% 50%; }
-      }
-
-      /* Diamond: GSAP sets scale(1.35) to visually match cap height */
-      .ld-c--dia {
-        margin-left: 0.16em;
-      }
-
-      /* Loading content column — only logo now */
-      .ld-content {
-        position: relative;
-        z-index: 2;
         display: flex;
         flex-direction: column;
         align-items: center;
+        justify-content: center;
+        pointer-events: none;
+      }
+      .loading-screen.hidden { display: none; }
+
+      .ld-wordmark {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-size: clamp(3.5rem, 8vw, 7rem);
+        letter-spacing: 0.06em;
+        color: rgba(215, 230, 255, 0.92);
+        line-height: 1;
+        filter:
+          drop-shadow(0 0 18px rgba(80, 145, 255, 0.55))
+          drop-shadow(0 0 55px rgba(54, 106, 255, 0.18));
+      }
+      .ld-dia {
+        font-size: 0.44em;
+        color: rgba(155, 198, 255, 0.60);
+        vertical-align: super;
+        margin-left: 0.1em;
+      }
+      .ld-tagline {
+        font-family: 'Fraunces', serif;
+        font-weight: 300;
+        font-style: italic;
+        font-size: clamp(0.70rem, 1.35vw, 0.92rem);
+        letter-spacing: 0.08em;
+        color: rgba(165, 198, 255, 0.42);
+        margin-top: 0.8em;
       }
 
       /* Progress bar — pinned to bottom, 80% wide */
@@ -212,20 +158,12 @@
         display: flex;
         align-items: center;
         gap: 1.1em;
-        z-index: 2;
-        opacity: 0;
-        animation: ld-bar-appear 0.7s ease 0.85s both;
-      }
-      @keyframes ld-bar-appear {
-        from { opacity: 0; transform: translateY(8px); }
-        to   { opacity: 1; transform: translateY(0);   }
       }
       .ld-bar-track {
         flex: 1;
-        height: 4px;
-        background: rgba(80, 120, 255, 0.12);
+        height: 3px;
+        background: rgba(80, 120, 255, 0.10);
         position: relative;
-        overflow: visible;
         border-radius: 2px;
       }
       .ld-bar-fill {
@@ -247,15 +185,15 @@
       }
       .ld-pct {
         font-family: 'Helvetica Neue', Arial, sans-serif;
-        font-size: 0.80rem;
+        font-size: 0.78rem;
         font-weight: 300;
         letter-spacing: 0.12em;
-        color: rgba(170, 210, 255, 0.92);
+        color: rgba(170, 210, 255, 0.88);
         min-width: 3.4em;
         text-align: right;
         text-shadow:
-          0 0 10px rgba(130, 185, 255, 0.85),
-          0 0 28px rgba(90,  150, 255, 0.45);
+          0 0 10px rgba(130, 185, 255, 0.80),
+          0 0 28px rgba(90,  150, 255, 0.40);
       }
 
       /* ── Projection overlay ──────────────────────────────────────── */
@@ -469,7 +407,7 @@
       /* ── Mobile (≤767px) ─────────────────────────────────────────── */
       @media (max-width: 767px) {
         /* Loading */
-        .ld-c { font-size: clamp(2.8rem, 14vw, 4.5rem); }
+        .ld-wordmark { font-size: clamp(2.5rem, 13vw, 4rem); }
         .ld-bar-wrap { left: 5%; width: 90%; bottom: 6vh; }
 
         /* Caption */
@@ -524,7 +462,7 @@
 
       /* ── Small phones (≤375px) ───────────────────────────────────── */
       @media (max-width: 375px) {
-        .ld-c { font-size: clamp(2.2rem, 16vw, 3.5rem); }
+        .ld-wordmark { font-size: clamp(2rem, 15vw, 3rem); }
         .caption { font-size: clamp(0.78rem, 4.2vw, 0.95rem); }
         .proj-line { font-size: clamp(0.76rem, 3.8vw, 0.9rem); }
       }
@@ -601,22 +539,14 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-DpU1jMMX.js"></script>
+    <script type="module" crossorigin src="/assets/index-DazZGray.js"></script>
   </head>
   <body>
 
-    <!-- ── Loading screen ─────────────────────────────────────────── -->
+    <!-- ── Loading screen — DOM overlay, WebGL curtain in canvas ─ -->
     <div class="loading-screen" id="loading">
-      <div class="ld-bg"></div>
-      <div class="ld-content">
-        <div class="ld-logo">
-          <span class="ld-c">H</span>
-          <span class="ld-c">O</span>
-          <span class="ld-c">L</span>
-          <span class="ld-c">M</span>
-          <span class="ld-c ld-c--dia">◆</span>
-        </div>
-      </div>
+      <div class="ld-wordmark">HOLM<span class="ld-dia">◆</span></div>
+      <p class="ld-tagline">Between sketch and masterpiece</p>
       <div class="ld-bar-wrap">
         <div class="ld-bar-track">
           <div class="ld-bar-fill" id="ld-fill"></div>
