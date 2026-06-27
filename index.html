@@ -194,6 +194,59 @@
         margin-left: 0.16em;
       }
 
+      /* Loading content column */
+      .ld-content {
+        position: relative;
+        z-index: 2;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 2.4rem;
+      }
+
+      /* Progress bar */
+      .ld-bar-wrap {
+        display: flex;
+        align-items: center;
+        gap: 0.9em;
+        width: clamp(220px, 36vw, 480px);
+        opacity: 0;
+        animation: ld-bar-appear 0.6s ease 0.9s both;
+      }
+      @keyframes ld-bar-appear {
+        from { opacity: 0; transform: translateY(6px); }
+        to   { opacity: 1; transform: translateY(0);   }
+      }
+      .ld-bar-track {
+        flex: 1;
+        height: 1px;
+        background: rgba(100, 140, 255, 0.15);
+        position: relative;
+        overflow: visible;
+      }
+      .ld-bar-fill {
+        position: absolute;
+        top: 0; left: 0; bottom: 0;
+        width: 0%;
+        background: linear-gradient(90deg,
+          hsl(232, 100%, 62%),
+          hsl(210, 100%, 76%),
+          hsl(198, 95%, 88%)
+        );
+        box-shadow:
+          0 0  5px rgba(120, 170, 255, 0.95),
+          0 0 14px rgba(80,  140, 255, 0.65),
+          0 0 32px rgba(60,  110, 255, 0.35);
+      }
+      .ld-pct {
+        font-family: 'Helvetica Neue', Arial, sans-serif;
+        font-size: 0.58rem;
+        letter-spacing: 0.10em;
+        color: rgba(140, 180, 255, 0.70);
+        min-width: 2.8em;
+        text-align: right;
+      }
+
       /* ── Projection overlay ──────────────────────────────────────── */
       #projection-overlay {
         position: fixed;
@@ -406,6 +459,7 @@
       @media (max-width: 767px) {
         /* Loading */
         .ld-c { font-size: clamp(2.8rem, 14vw, 4.5rem); }
+        .ld-bar-wrap { width: clamp(180px, 70vw, 320px); }
 
         /* Caption */
         .caption-layer { bottom: 14vh; }
@@ -536,19 +590,27 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-DE73LW18.js"></script>
+    <script type="module" crossorigin src="/assets/index-D4e8xMR1.js"></script>
   </head>
   <body>
 
     <!-- ── Loading screen ─────────────────────────────────────────── -->
     <div class="loading-screen" id="loading">
       <div class="ld-bg"></div>
-      <div class="ld-logo">
-        <span class="ld-c">H</span>
-        <span class="ld-c">O</span>
-        <span class="ld-c">L</span>
-        <span class="ld-c">M</span>
-        <span class="ld-c ld-c--dia">◆</span>
+      <div class="ld-content">
+        <div class="ld-logo">
+          <span class="ld-c">H</span>
+          <span class="ld-c">O</span>
+          <span class="ld-c">L</span>
+          <span class="ld-c">M</span>
+          <span class="ld-c ld-c--dia">◆</span>
+        </div>
+        <div class="ld-bar-wrap">
+          <div class="ld-bar-track">
+            <div class="ld-bar-fill" id="ld-fill"></div>
+          </div>
+          <span class="ld-pct" id="ld-percent">0%</span>
+        </div>
       </div>
     </div>
 
