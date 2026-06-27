@@ -11,6 +11,11 @@ import {
   SHATTER_T_DISSOLVE_END,
 } from "./three/shatter.js";
 
+// Progress bar refs — declared here so the loading block below can access them
+const _ldFill    = document.getElementById('ld-fill');
+const _ldPct     = document.getElementById('ld-percent');
+const _ldCounter = { val: 0 };
+
 // Loading: split-letter reveal — GSAP controls y/opacity, CSS handles aurora gradient
 {
   const _lc = document.querySelectorAll('.ld-c');
@@ -20,6 +25,17 @@ import {
     opacity: 1, y: 0, filter: 'blur(0px)',
     duration: 0.8, stagger: 0.10, ease: 'power3.out', delay: 0.35,
   });
+  // Fake progress 0 → 90% while models load
+  if (_ldFill && _ldPct) {
+    gsap.to(_ldCounter, {
+      val: 90, duration: 1.55, ease: 'power1.inOut', delay: 0.3,
+      onUpdate() {
+        const v = Math.round(_ldCounter.val);
+        _ldFill.style.width = v + '%';
+        _ldPct.textContent  = v + '%';
+      },
+    });
+  }
 }
 
 // ---------- Device detection (must precede MODEL_DEFS) ----------
@@ -553,13 +569,21 @@ async function boot() {
   // Brief buffer for GPU shader compilation
   await new Promise(r => setTimeout(r, 200));
 
+  // Snap progress bar to 100% and hold so user sees completion
+  if (_ldFill && _ldPct) {
+    gsap.killTweensOf(_ldCounter);
+    _ldFill.style.width = '100%';
+    _ldPct.textContent  = '100%';
+  }
+  await new Promise(r => setTimeout(r, 300));
+
   // Start render loop first — 3D scene must be live before dissolve reveals it
   requestAnimationFrame(tick);
 
   // Intro camera push
   gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
 
-  // Tile shatter dissolve — pieces vanish randomly, revealing the scene beneath
+  // Strips collapse from alternating ends, revealing the 3D scene beneath
   dissolveLoadingScreen();
 
   // Wordmark + caption after dissolve settles (~1.0s)
@@ -588,37 +612,29 @@ async function boot() {
   }
 }
 
-// ---------- Loading dissolve — tile shatter reveal ----------
+// ---------- Loading dissolve — vertical strips collapse from alternating ends ----------
 function dissolveLoadingScreen() {
-  const COLS = 14, ROWS = 8;
-  const cells = [];
-  const frag  = document.createDocumentFragment();
-  for (let i = 0; i < COLS * ROWS; i++) {
-    const col = i % COLS, row = Math.floor(i / COLS);
-    const el  = document.createElement('div');
+  const N = 10;
+  const strips = [];
+  for (let i = 0; i < N; i++) {
+    const el = document.createElement('div');
     el.style.cssText =
-      'position:absolute;' +
-      `left:${(col / COLS * 100).toFixed(3)}%;` +
-      `top:${(row / ROWS * 100).toFixed(3)}%;` +
-      `width:${(100 / COLS + 0.6).toFixed(3)}%;` +
-      `height:${(100 / ROWS + 0.6).toFixed(3)}%;` +
-      'background:#06060a;' +
-      'will-change:transform,opacity;';
-    frag.appendChild(el);
-    cells.push(el);
+      'position:fixed;top:0;height:100%;' +
+      `left:${(i * 10).toFixed(1)}%;width:10.5%;` +
+      'background:#06060a;z-index:100;' +
+      `transform-origin:${i % 2 === 0 ? 'top' : 'bottom'} center;` +
+      'will-change:transform;';
+    document.body.appendChild(el);
+    strips.push(el);
   }
-  loadingEl.style.pointerEvents = 'none';
-  loadingEl.style.background    = 'transparent';
-  loadingEl.appendChild(frag);
-
-  gsap.to(cells, {
-    scale:  0,
-    opacity: 0,
-    transformOrigin: 'center center',
-    duration: 0.30,
-    stagger: { each: 0.007, from: 'random', grid: [ROWS, COLS] },
-    ease: 'power3.in',
-    onComplete: () => { loadingEl.style.display = 'none'; },
+  // Hide the loading DOM immediately — strips cover the screen
+  loadingEl.style.display = 'none';
+  gsap.to(strips, {
+    scaleY: 0,
+    duration: 0.55,
+    stagger: { each: 0.055, from: 'random' },
+    ease: 'power3.inOut',
+    onComplete: () => strips.forEach(el => el.remove()),
   });
 }
 
