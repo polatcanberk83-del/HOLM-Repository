@@ -14,11 +14,11 @@ import {
 // Loading: split-letter reveal — GSAP controls y/opacity, CSS handles aurora gradient
 {
   const _lc = document.querySelectorAll('.ld-c');
-  gsap.set(_lc, { opacity: 0, y: 32, filter: 'blur(10px)' });
-  gsap.set('.ld-c--dia', { scale: 1.35, y: 32 });
+  gsap.set(_lc, { opacity: 0, y: 28, filter: 'blur(10px)' });
+  gsap.set('.ld-c--dia', { scale: 1.35, y: 28 });
   gsap.to(_lc, {
     opacity: 1, y: 0, filter: 'blur(0px)',
-    duration: 1.0, stagger: 0.14, ease: 'power3.out', delay: 0.5,
+    duration: 0.8, stagger: 0.10, ease: 'power3.out', delay: 0.35,
   });
 }
 
@@ -540,46 +540,33 @@ async function boot() {
   // Hide wordmark initially — revealed after loading completes
   if (wordmarkEl) wordmarkEl.style.opacity = "0";
 
-  // CSS drives the loading animation; wait minimum 2.4s for reveal sequence to complete
+  // CSS drives the loading animation; wait minimum 1.8s for reveal sequence to complete
   const modelsPromise = loadAllModels();
   await Promise.all([
     modelsPromise,
-    new Promise(r => setTimeout(r, 2400)),
+    new Promise(r => setTimeout(r, 1800)),
   ]);
   if (voidFigureModel)  shatter.setSurface(voidFigureModel);
   if (heroCanvasModel)  shatter.setHeroCanvas(heroCanvasModel);
   if (!isMobile) createDustParticles();
 
   // Brief buffer for GPU shader compilation
-  await new Promise(r => setTimeout(r, 300));
-  loadingEl.classList.add("hidden");
+  await new Promise(r => setTimeout(r, 200));
 
-  // Intro animation: ease camera forward into scene
-  gsap.to(camera.position, {
-    z: p0.z,
-    duration: 2.5,
-    ease: "power2.inOut",
-  });
-
-  // Wordmark fade in
-  if (wordmarkEl) {
-    gsap.to(wordmarkEl, {
-      opacity: 0.85,
-      duration: 1.5,
-      delay: 0.5,
-      ease: "power2.out",
-    });
-  }
-
-  // Caption fade in
-  gsap.to(captionEl, {
-    opacity: 1,
-    duration: 1.0,
-    delay: 0.8,
-    ease: "power2.out",
-  });
-
+  // Start render loop first — 3D scene must be live before dissolve reveals it
   requestAnimationFrame(tick);
+
+  // Intro camera push
+  gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
+
+  // Tile shatter dissolve — pieces vanish randomly, revealing the scene beneath
+  dissolveLoadingScreen();
+
+  // Wordmark + caption after dissolve settles (~1.0s)
+  if (wordmarkEl) {
+    gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 0.9, ease: "power2.out" });
+  }
+  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 1.2, ease: "power2.out" });
 
   // Magnetic CTA — elastic snap-back on leave
   const ctaBtn = document.querySelector(".proj-cta");
@@ -599,6 +586,40 @@ async function boot() {
       ctaBtn.addEventListener("mouseleave", () => diamondCursor.classList.remove("hovering"));
     }
   }
+}
+
+// ---------- Loading dissolve — tile shatter reveal ----------
+function dissolveLoadingScreen() {
+  const COLS = 14, ROWS = 8;
+  const cells = [];
+  const frag  = document.createDocumentFragment();
+  for (let i = 0; i < COLS * ROWS; i++) {
+    const col = i % COLS, row = Math.floor(i / COLS);
+    const el  = document.createElement('div');
+    el.style.cssText =
+      'position:absolute;' +
+      `left:${(col / COLS * 100).toFixed(3)}%;` +
+      `top:${(row / ROWS * 100).toFixed(3)}%;` +
+      `width:${(100 / COLS + 0.6).toFixed(3)}%;` +
+      `height:${(100 / ROWS + 0.6).toFixed(3)}%;` +
+      'background:#06060a;' +
+      'will-change:transform,opacity;';
+    frag.appendChild(el);
+    cells.push(el);
+  }
+  loadingEl.style.pointerEvents = 'none';
+  loadingEl.style.background    = 'transparent';
+  loadingEl.appendChild(frag);
+
+  gsap.to(cells, {
+    scale:  0,
+    opacity: 0,
+    transformOrigin: 'center center',
+    duration: 0.30,
+    stagger: { each: 0.007, from: 'random', grid: [ROWS, COLS] },
+    ease: 'power3.in',
+    onComplete: () => { loadingEl.style.display = 'none'; },
+  });
 }
 
 boot();

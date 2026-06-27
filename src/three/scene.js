@@ -100,7 +100,7 @@ export function createScene(canvas, isMobile = false) {
         float dirt2 = fbm(vec2(vWorldPos.z * 3.0 + dirt * 0.6, vWorldPos.x * 7.0 + vWorldPos.y * 4.0));
         col *= (0.93 + dirt * 0.04 + dirt2 * 0.03);
 
-        col *= 4.0; // genel parlaklık — ince ayar buradan
+        col *= 5.2; // genel parlaklık — ince ayar buradan
         gl_FragColor = vec4(col, 1.0);
       }
     `,
