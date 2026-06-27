@@ -98,7 +98,7 @@ export function createScene(canvas, isMobile = false) {
         // Kir/grunge katmanı — statik yüksek frekanslı leke deseni
         float dirt = fbm(vec2(vWorldPos.x * 5.5 + vWorldPos.z * 1.2, vWorldPos.y * 9.0));
         float dirt2 = fbm(vec2(vWorldPos.z * 3.0 + dirt * 0.6, vWorldPos.x * 7.0 + vWorldPos.y * 4.0));
-        col *= (0.72 + dirt * 0.18 + dirt2 * 0.10);
+        col *= (0.84 + dirt * 0.10 + dirt2 * 0.06);
 
         col *= 4.0; // genel parlaklık — ince ayar buradan
         gl_FragColor = vec4(col, 1.0);
