@@ -122,6 +122,11 @@
       }
       .loading-screen.hidden { display: none; }
 
+      @keyframes ld-appear {
+        from { opacity: 0; transform: translateY(12px); }
+        to   { opacity: 1; transform: translateY(0); }
+      }
+
       .ld-wordmark {
         font-family: 'Fraunces', serif;
         font-weight: 300;
@@ -132,6 +137,8 @@
         filter:
           drop-shadow(0 0 18px rgba(80, 145, 255, 0.55))
           drop-shadow(0 0 55px rgba(54, 106, 255, 0.18));
+        opacity: 0;
+        animation: ld-appear 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.25s both;
       }
       .ld-dia {
         font-size: 0.44em;
@@ -147,6 +154,8 @@
         letter-spacing: 0.08em;
         color: rgba(165, 198, 255, 0.42);
         margin-top: 0.8em;
+        opacity: 0;
+        animation: ld-appear 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.45s both;
       }
 
       /* Progress bar — pinned to bottom, 80% wide */
@@ -158,6 +167,8 @@
         display: flex;
         align-items: center;
         gap: 1.1em;
+        opacity: 0;
+        animation: ld-appear 0.7s ease 0.65s both;
       }
       .ld-bar-track {
         flex: 1;
@@ -539,7 +550,7 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-DazZGray.js"></script>
+    <script type="module" crossorigin src="/assets/index-9XwGj0mZ.js"></script>
   </head>
   <body>
 
