@@ -515,36 +515,26 @@ async function boot() {
     },
   });
 
-  // Initial progress floor — bar shows immediately, not frozen at 0
-  introLoader.setProgress(0.04);
+  // Initial progress floor so diamond ring isn't frozen at 0 on first frame
+  introLoader.setProgress(0.03);
 
-  // Start RAF — cloth covers the scene from frame 1 (warm-up: ≥2 frames before start() can fire)
+  // Start RAF — cloth covers scene from frame 1 (≥2 frames required before start())
   requestAnimationFrame(tick);
 
-  // Load critical models (first 3) with real progress tracking
-  const CRITICAL = MODEL_DEFS.slice(0, 3);
-  const LAZY     = MODEL_DEFS.slice(3);
-
-  for (let i = 0; i < CRITICAL.length; i++) {
-    await loadOneModel(CRITICAL[i], i);
-    introLoader.setProgress((i + 1) / CRITICAL.length);
+  // Load ALL models before reveal — "tamamen hazır olana kadar"
+  for (let i = 0; i < MODEL_DEFS.length; i++) {
+    await loadOneModel(MODEL_DEFS[i], i);
+    introLoader.setProgress((i + 1) / MODEL_DEFS.length);
   }
 
   if (!isMobile) createDustParticles();
 
-  // Hold at 100% briefly so the full ring is visible
+  // Hold at 100% so the completed diamond is fully visible before tearing
   introLoader.setProgress(1.0);
-  await new Promise(r => setTimeout(r, 520));
+  await new Promise(r => setTimeout(r, 600));
 
-  // Fire cloth-tear reveal (guards itself with frame warm-up check)
+  // Fire cloth-tear reveal
   introLoader.start();
-
-  // Lazy models load in background while cloth tears
-  for (let i = 0; i < LAZY.length; i++) {
-    loadOneModel(LAZY[i], CRITICAL.length + i).catch(err =>
-      console.error("[HOLM] lazy load failed", err),
-    );
-  }
 
   // CTA button magnetic hover
   const ctaBtn = document.querySelector(".proj-cta");

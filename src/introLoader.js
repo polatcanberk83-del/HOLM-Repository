@@ -36,7 +36,7 @@ void main() {
 }
 `;
 
-// ── Noise helpers (prepended to fragment shader) ─────────────────────────────
+// ── Noise helpers ────────────────────────────────────────────────────────────
 const FRAG_NOISE = /* glsl */`
 vec3 permute(vec3 x) { return mod(((x * 34.0) + 1.0) * x, 289.0); }
 
@@ -70,7 +70,7 @@ float fbm(vec2 x, float seed) {
   vec2  shift = vec2(100.0);
   mat2  rot = mat2(cos(0.5), sin(0.5), -sin(0.5), cos(0.5));
   for (int i = 0; i < 5; i++) {
-    v += a * snoise(x + vec2(seed));   // vec2(seed) required — no implicit cast
+    v += a * snoise(x + vec2(seed));
     x  = rot * x * 2.0 + shift;
     a *= 0.5;
   }
@@ -95,7 +95,8 @@ void main() {
 
   // ── Tear gap ──────────────────────────────────────────────────
   float seam  = 0.5 + snoise(vec2(vUv.y * 7.0, uSeed)) * 0.04;
-  float jag   = fbm(vec2(vUv.y * 16.0, uSeed + 3.0), uSeed) * 0.06;
+  // Increased jag multiplier (0.10 vs 0.06) for more ragged tear edge
+  float jag   = fbm(vec2(vUv.y * 16.0, uSeed + 3.0), uSeed) * 0.10;
   float gap   = uTear * 0.55;
   float dseam = abs(vUv.x - seam);
   if (dseam < gap + jag * uTear) discard;
@@ -142,10 +143,15 @@ void main() {
 }
 `;
 
+// Diamond SVG path (84×84 viewBox, top → right → bottom → left → top)
+const DIAMOND_PATH  = "M42,5 L79,42 L42,79 L5,42 Z";
+// Perimeter: 4 × √(37² + 37²) = 4 × 37√2 ≈ 209.3
+const DIAMOND_PERIM = 4 * 37 * Math.SQRT2;
+
 // ── IntroLoader class ────────────────────────────────────────────────────────
 export class IntroLoader {
   constructor(opts = {}) {
-    this.tearDuration = opts.tearDuration ?? 1.6;
+    this.tearDuration = opts.tearDuration ?? 2.8;   // slow, cinematic
     this.edgeAmp      = opts.edgeAmp      ?? 0.04;
     this.grainAmp     = opts.grainAmp     ?? 0.05;
     this.logoH        = opts.logoH        ?? 0.24;
@@ -157,7 +163,7 @@ export class IntroLoader {
     this._mat       = null;
     this._mesh      = null;
     this._container = null;
-    this._ringFill  = null;
+    this._diamondFill = null;
     this._ringPct   = null;
     this._blobUrl   = null;
 
@@ -179,17 +185,16 @@ export class IntroLoader {
     this._onComplete = onComplete;
     this._isMobile   = isMobile;
 
-    // Camera — dedicated to this overlay, fov 45, camera at z=2.5
     this.camera = new THREE.PerspectiveCamera(
       45, window.innerWidth / window.innerHeight, 0.1, 10,
     );
     this.camera.position.z = 2.5;
-
     this.scene = new THREE.Scene();
 
-    // 1×1 transparent placeholder so the sampler never sees null
-    const blankData = new Uint8Array([255, 255, 255, 0]);
-    const blankTex  = new THREE.DataTexture(blankData, 1, 1, THREE.RGBAFormat);
+    // Blank 1×1 texture so sampler never gets null before logo loads
+    const blankTex = new THREE.DataTexture(
+      new Uint8Array([255, 255, 255, 0]), 1, 1, THREE.RGBAFormat,
+    );
     blankTex.needsUpdate = true;
 
     this._mat = new THREE.ShaderMaterial({
@@ -225,8 +230,10 @@ export class IntroLoader {
     });
 
     const segs = isMobile ? 48 : 80;
-    const geo  = new THREE.PlaneGeometry(1, 1, segs, segs);
-    this._mesh = new THREE.Mesh(geo, this._mat);
+    this._mesh = new THREE.Mesh(
+      new THREE.PlaneGeometry(1, 1, segs, segs),
+      this._mat,
+    );
     this.scene.add(this._mesh);
 
     this._resizeHandler = () => this._recomputeSize();
@@ -243,43 +250,45 @@ export class IntroLoader {
     this._targetProgress = Math.max(0, Math.min(1, t));
   }
 
-  // Call once per RAF frame (before render)
   update(elapsed) {
     if (!this.active) return;
     this._frames++;
 
-    // Wind gust — two sine harmonics
+    // Wind gust — two overlapping sine harmonics for organic feel
     const g = Math.max(0,
       Math.sin(elapsed * 0.7) + 0.5 * Math.sin(elapsed * 2.3) + 0.5,
     );
     this._mat.uniforms.uWindStrength.value = g * 0.18 * 0.3 + 0.05;
     this._mat.uniforms.uTime.value = elapsed;
 
-    // Lerped progress → ring
+    // Lerped progress → diamond ring
     this._dispProgress += (this._targetProgress - this._dispProgress) * 0.08;
-    const pct  = Math.min(Math.round(this._dispProgress * 100), 100);
-    const circ = 2 * Math.PI * 36;
-    if (this._ringFill) {
-      this._ringFill.setAttribute(
-        "stroke-dashoffset",
-        (circ * (1 - this._dispProgress)).toFixed(2),
-      );
+    const pct    = Math.min(Math.round(this._dispProgress * 100), 100);
+    const offset = (DIAMOND_PERIM * (1 - this._dispProgress)).toFixed(2);
+    if (this._diamondFill) {
+      this._diamondFill.setAttribute("stroke-dashoffset", offset);
     }
     if (this._ringPct) this._ringPct.textContent = pct + "%";
   }
 
-  // Trigger the cloth-tear reveal — call when assets are ready
   start() {
     if (!this.active || this._frames < 2) return;
 
     const mat      = this._mat;
-    const ringWrap = this._container?.querySelector(".intro-ring-wrap");
-    const dur      = this._isMobile ? 1.2 : this.tearDuration;
+    const indicator = this._container?.querySelector(".intro-diamond-wrap");
+    const dur      = this._isMobile ? 2.0 : this.tearDuration;
     const self     = this;
 
     const tl = gsap.timeline();
-    if (ringWrap) tl.to(ringWrap, { opacity: 0, duration: 0.4, ease: "power2.out" });
-    tl.to(mat.uniforms.uTear, { value: 1, duration: dur, ease: "power2.in" }, "-=0.1")
+    if (indicator) {
+      tl.to(indicator, { opacity: 0, duration: 0.5, ease: "power2.out" });
+    }
+    // Slight pause at zero tear so user registers the cloth before it tears
+    tl.to(mat.uniforms.uTear, {
+      value: 1,
+      duration: dur,
+      ease: "power1.in",   // very gradual start — feels like resistance giving way
+    }, "-=0.05")
       .add(() => {
         self.active = false;
         if (self._onComplete) self._onComplete();
@@ -324,10 +333,11 @@ export class IntroLoader {
     const visH = 2 * Math.tan(THREE.MathUtils.degToRad(45) / 2) * dist;
     const visW = visH * aspect;
 
-    let sheetW = visW * 0.85;
-    let sheetH = visH * 0.85;
-    // Clamp on portrait / mobile so cloth never overflows
-    if (sheetW > visW * 0.92) sheetW = visW * 0.92;
+    // 95% of viewport — nearly full coverage, still shows edges
+    let sheetW = visW * 0.95;
+    let sheetH = visH * 0.95;
+    // Portrait / mobile guard — never overflow horizontally
+    if (sheetW > visW * 0.97) sheetW = visW * 0.97;
 
     this._mesh.scale.set(sheetW, sheetH, 1);
     this._mat.uniforms.uSheetAspect.value = sheetW / sheetH;
@@ -337,20 +347,18 @@ export class IntroLoader {
     try {
       const resp    = await fetch(logoUrl);
       const svgText = await resp.text();
-      // SVG uses currentColor — replace with white so alpha channel is clean coverage
       const whiteSvg = svgText.replace(/currentColor/g, "#ffffff");
       const blob     = new Blob([whiteSvg], { type: "image/svg+xml" });
       this._blobUrl  = URL.createObjectURL(blob);
 
       const W = 1024;
-      const H = Math.round(1024 / (441 / 180)); // ≈ 415 — preserves 441×180 viewBox ratio
+      const H = Math.round(1024 / (441 / 180));
 
       const img = new Image();
       img.onload = () => {
-        if (!this._mat) return; // destroyed before load finished
+        if (!this._mat) return;
         const cv = document.createElement("canvas");
-        cv.width  = W;
-        cv.height = H;
+        cv.width  = W; cv.height = H;
         cv.getContext("2d").drawImage(img, 0, 0, W, H);
         const tex = new THREE.CanvasTexture(cv);
         tex.minFilter = tex.magFilter = THREE.LinearFilter;
@@ -364,24 +372,33 @@ export class IntroLoader {
   }
 
   _createDOM() {
-    const circ = (2 * Math.PI * 36).toFixed(2); // circumference for r=36 → 226.19
+    const perim = DIAMOND_PERIM.toFixed(2); // ≈ 209.3
 
     const container = document.createElement("div");
     container.id    = "holm-intro-overlay";
+
+    // Diamond SVG: top → right → bottom → left, drawn with ink tones on cream
     container.innerHTML = `
-      <div class="intro-ring-wrap">
-        <svg class="intro-ring" width="84" height="84" viewBox="0 0 84 84">
-          <circle cx="42" cy="42" r="36"
-            fill="none" stroke="rgba(180,160,130,0.16)" stroke-width="1.5"/>
-          <circle class="intro-ring-fill" cx="42" cy="42" r="36"
+      <div class="intro-diamond-wrap">
+        <svg class="intro-diamond-svg" width="72" height="72" viewBox="0 0 84 84">
+          <!-- track outline -->
+          <path d="${DIAMOND_PATH}"
             fill="none"
-            stroke="rgba(205,185,150,0.90)"
-            stroke-width="2.5"
-            stroke-dasharray="${circ}"
-            stroke-dashoffset="${circ}"
-            stroke-linecap="round"/>
+            stroke="rgba(22,21,16,0.18)"
+            stroke-width="1"
+            stroke-linejoin="miter"/>
+          <!-- progress fill — drawn like ink from top point, clockwise -->
+          <path class="intro-diamond-fill"
+            d="${DIAMOND_PATH}"
+            fill="none"
+            stroke="rgba(22,21,16,0.82)"
+            stroke-width="2"
+            stroke-dasharray="${perim}"
+            stroke-dashoffset="${perim}"
+            stroke-linecap="round"
+            stroke-linejoin="round"/>
         </svg>
-        <span class="intro-ring-pct">0%</span>
+        <span class="intro-diamond-pct">0%</span>
       </div>
     `;
 
@@ -390,27 +407,28 @@ export class IntroLoader {
       pointerEvents: "none", zIndex: "20",
     });
 
-    const wrap = container.querySelector(".intro-ring-wrap");
+    const wrap = container.querySelector(".intro-diamond-wrap");
     Object.assign(wrap.style, {
-      position: "absolute",
-      bottom:   "5vh", right: "5vw",
-      display:  "flex", flexDirection: "column",
-      alignItems: "center", gap: "6px",
+      position:       "absolute",
+      bottom:         "5vh",
+      right:          "5vw",
+      display:        "flex",
+      flexDirection:  "column",
+      alignItems:     "center",
+      gap:            "6px",
     });
 
-    container.querySelector(".intro-ring").style.transform = "rotate(-90deg)";
-
-    const pct = container.querySelector(".intro-ring-pct");
+    const pct = container.querySelector(".intro-diamond-pct");
     Object.assign(pct.style, {
       fontFamily:    "'Helvetica Neue', Arial, sans-serif",
-      fontSize:      "0.62rem",
-      letterSpacing: "0.14em",
-      color:         "rgba(200,185,160,0.65)",
+      fontSize:      "0.58rem",
+      letterSpacing: "0.16em",
+      color:         "rgba(22,21,16,0.52)",
     });
 
     document.body.appendChild(container);
-    this._container = container;
-    this._ringFill  = container.querySelector(".intro-ring-fill");
-    this._ringPct   = pct;
+    this._container   = container;
+    this._diamondFill = container.querySelector(".intro-diamond-fill");
+    this._ringPct     = pct;
   }
 }
