@@ -6,6 +6,76 @@ import { ShaderPass }      from "three/examples/jsm/postprocessing/ShaderPass.js
 import { SSAOPass }        from "three/examples/jsm/postprocessing/SSAOPass.js";
 import { BokehPass }       from "three/examples/jsm/postprocessing/BokehPass.js";
 
+// ---------- Liquid Cursor ----------
+const LiquidCursorShader = {
+  uniforms: {
+    tDiffuse:    { value: null },
+    uMouse:      { value: new THREE.Vector2(0.5, 0.5) },
+    uTime:       { value: 0.0 },
+    uResolution: { value: new THREE.Vector2(1, 1) },
+  },
+  vertexShader: /* glsl */`
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+    }
+  `,
+  fragmentShader: /* glsl */`
+    uniform sampler2D tDiffuse;
+    uniform vec2  uMouse;
+    uniform float uTime;
+    uniform vec2  uResolution;
+    varying vec2  vUv;
+
+    float liqNoise(vec2 p) {
+      float a = sin(p.x * 4.3 + uTime * 0.9)  * cos(p.y * 3.7 + uTime * 0.7)  * 0.50;
+      float b = sin(p.x * 7.1 - uTime * 1.3 + p.y * 5.9)                       * 0.30;
+      float c = cos(p.x * 12.0 + p.y * 8.0   + uTime * 1.8)                    * 0.20;
+      return a + b + c;
+    }
+
+    void main() {
+      vec2 uv      = vUv;
+      float aspect = uResolution.x / uResolution.y;
+
+      vec2  d    = (uv - uMouse) * vec2(aspect, 1.0);
+      float dist = length(d);
+
+      float radius  = 0.095 + sin(uTime * 0.65) * 0.004;
+      float noise   = liqNoise(uv * 3.0) * 0.022;
+      float eDist   = dist + noise;
+
+      if (eDist < radius) {
+        vec2  dir     = (dist > 0.001) ? d / dist : vec2(0.0);
+        float falloff = smoothstep(radius, 0.0, eDist);
+
+        // swirl rotation around cursor
+        float swirl = sin(atan(d.y, d.x) * 3.0 + uTime * 1.6) * 0.028;
+        vec2  perp  = vec2(-dir.y, dir.x);
+
+        // lens push + liquid swirl
+        vec2 disp = dir * (0.13 * falloff) + perp * (swirl * falloff);
+        disp.x /= aspect; // undo aspect on displacement
+
+        // chromatic split inside blob
+        float r = texture2D(tDiffuse, uv - disp * 1.18).r;
+        float g = texture2D(tDiffuse, uv - disp       ).g;
+        float b = texture2D(tDiffuse, uv - disp * 0.82).b;
+
+        // thin glow ring at edge
+        float ring = smoothstep(radius * 0.76, radius * 0.88, eDist)
+                   - smoothstep(radius * 0.90, radius,        eDist);
+        vec3 col = vec3(r, g, b) + ring * vec3(0.38, 0.52, 1.0) * 0.55;
+
+        gl_FragColor = vec4(col, 1.0);
+      } else {
+        gl_FragColor = texture2D(tDiffuse, uv);
+      }
+    }
+  `,
+};
+
 // ---------- Chromatic Aberration ----------
 const ChromaShader = {
   uniforms: {
@@ -123,7 +193,15 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     composer.addPass(chroma);
   }
 
-  // 6. Film grain + vignette — always last pass (mobile: grain disabled, vignette only)
+  // 6. Liquid cursor distortion — desktop only
+  let liquid = null;
+  if (!isMobile) {
+    liquid = new ShaderPass(LiquidCursorShader);
+    liquid.uniforms.uResolution.value.set(w, h);
+    composer.addPass(liquid);
+  }
+
+  // 7. Film grain + vignette — always last pass (mobile: grain disabled, vignette only)
   const grainVignette = new ShaderPass(GrainVignetteShader);
   if (isMobile) grainVignette.uniforms.uGrainAmp.value = 0;
   grainVignette.renderToScreen = true;
@@ -135,11 +213,13 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     chroma,
     ssao,
     bokeh,
+    liquid,
     grainVignette,
     setSize(newW, newH) {
       composer.setSize(newW, newH);
-      if (bloom) bloom.setSize(newW, newH);
-      if (ssao)  ssao.setSize(newW, newH);
+      if (bloom)   bloom.setSize(newW, newH);
+      if (ssao)    ssao.setSize(newW, newH);
+      if (liquid)  liquid.uniforms.uResolution.value.set(newW, newH);
     },
   };
 }

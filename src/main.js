@@ -39,7 +39,6 @@ const captionEl       = document.getElementById("caption");
 const gatheringTextEl = document.getElementById("gathering-text");
 const wordmarkEl      = document.querySelector(".wordmark");
 const scrollHintEl    = document.getElementById("scroll-hint");
-const diamondCursor   = document.getElementById("diamond-cursor");
 
 // ---------- Three.js ----------
 const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms, onResize } = createScene(canvas, isMobile);
@@ -59,48 +58,14 @@ let _shatterCaptured = false;
 // Cloth-tear intro loader — scene/camera props accessed in tick()
 const introLoader = new IntroLoader();
 
-// ---------- Custom cursor + glow trail ----------
-let _mouseNX = 0.5, _mouseNY = 0.5;
-
-const TRAIL_COUNT  = 14;
-const _trailEls    = [];
-let   _trailIdx    = 0;
-let   _lastTrailMs = 0;
+// ---------- Liquid cursor — spring-tracked mouse ----------
+let _tgtX = 0.5, _tgtY = 0.5;
+let _sprX = 0.5, _sprY = 0.5;
 
 if (!isMobile) {
-  for (let i = 0; i < TRAIL_COUNT; i++) {
-    const el = document.createElement("div");
-    el.className = "cursor-trail";
-    el.style.opacity = "0";
-    document.body.appendChild(el);
-    _trailEls.push(el);
-  }
-}
-
-if (!isMobile && diamondCursor) {
-  canvas.style.cursor = "none";
-  document.body.style.cursor = "none";
   window.addEventListener("mousemove", e => {
-    diamondCursor.style.left = e.clientX + "px";
-    diamondCursor.style.top  = e.clientY + "px";
-    _mouseNX = e.clientX / window.innerWidth;
-    _mouseNY = e.clientY / window.innerHeight;
-
-    const now = performance.now();
-    if (now - _lastTrailMs > 28) {
-      _lastTrailMs = now;
-      const el = _trailEls[_trailIdx % TRAIL_COUNT];
-      _trailIdx++;
-      el.style.transition = "none";
-      el.style.left       = e.clientX + "px";
-      el.style.top        = e.clientY + "px";
-      el.style.opacity    = "0.8";
-      el.style.transform  = "translate(-50%, -50%) scale(1)";
-      el.offsetHeight; // force reflow
-      el.style.transition = "opacity 0.55s ease-out, transform 0.55s ease-out";
-      el.style.opacity    = "0";
-      el.style.transform  = "translate(-50%, -50%) scale(0.1)";
-    }
+    _tgtX = e.clientX / window.innerWidth;
+    _tgtY = e.clientY / window.innerHeight;
   });
 }
 
@@ -450,11 +415,14 @@ function tick(now = 0) {
   if (post.grainVignette) post.grainVignette.uniforms.uTime.value  = elapsed;
   wallUniforms.uTime.value = elapsed;
 
-  if (!isMobile) animateDust(elapsed);
-
-  if (!isMobile && diamondCursor) {
-    diamondCursor.classList.toggle("model-hover", hoveredZ !== null);
+  if (!isMobile && post.liquid) {
+    _sprX += (_tgtX - _sprX) * 0.10;
+    _sprY += (_tgtY - _sprY) * 0.10;
+    post.liquid.uniforms.uMouse.value.set(_sprX, 1.0 - _sprY);
+    post.liquid.uniforms.uTime.value = elapsed;
   }
+
+  if (!isMobile) animateDust(elapsed);
 
   const effectT = isMobile ? splineTSmooth : splineT;
   if (effectT >= SHATTER_T_ENTER && !_shatterCaptured) {
@@ -548,10 +516,6 @@ async function boot() {
     ctaBtn.addEventListener("mouseleave", () =>
       gsap.to(ctaBtn, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.45)" }),
     );
-    if (!isMobile && diamondCursor) {
-      ctaBtn.addEventListener("mouseenter", () => diamondCursor.classList.add("hovering"));
-      ctaBtn.addEventListener("mouseleave", () => diamondCursor.classList.remove("hovering"));
-    }
   }
 }
 
