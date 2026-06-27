@@ -35,44 +35,71 @@ export function createScene(canvas, isMobile = false) {
   // Bloom eşiği (threshold=0.9, exposure=6.5): mavi kanal 0x1c (0.11 linear)
   // × WALL_EMISSIVE × 6.5 ≈ 0.43 — eşiğin çok altında, bloom şişirmez.
   // İnce ayar: bu tek değeri değiştir.
-  const WALL_EMISSIVE = 25.0;  // ince ayar buradan — modeli etkilemez, sadece duvar yüzeyi
-  const wallUniforms  = { uTime: { value: 0 } };
+  const wallUniforms = { uTime: { value: 0 } };
 
-  const roomMat = new THREE.MeshStandardMaterial({
-    color:             0x1c1c2a,
-    roughness:         0.95,
-    metalness:         0,
-    side:              THREE.BackSide,
-    emissive:          new THREE.Color(0x0e1c30),
-    emissiveIntensity: WALL_EMISSIVE,
+  // Tamamen custom ShaderMaterial — MeshStandardMaterial injection yerine
+  // domain-warped 5-oktav FBM, derinlik karartması, kenar vignette
+  const roomMat = new THREE.ShaderMaterial({
+    uniforms: wallUniforms,
+    side: THREE.BackSide,
+    vertexShader: /* glsl */`
+      varying vec3 vWorldPos;
+      void main() {
+        vWorldPos   = (modelMatrix * vec4(position, 1.0)).xyz;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: /* glsl */`
+      precision highp float;
+      uniform float uTime;
+      varying vec3  vWorldPos;
+
+      float hash(vec2 p) {
+        p = fract(p * vec2(234.34, 435.35));
+        p += dot(p, p + 34.23);
+        return fract(p.x * p.y);
+      }
+      float noise(vec2 p) {
+        vec2 i = floor(p), f = fract(p);
+        f = f * f * (3.0 - 2.0 * f);
+        return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
+                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
+      }
+      float fbm(vec2 p) {
+        float v = 0.0, a = 0.5;
+        for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.3 + vec2(1.7, 0.9); a *= 0.45; }
+        return v;
+      }
+
+      void main() {
+        float z = clamp((vWorldPos.z + 80.0) / 90.0, 0.0, 1.0); // 0=uzak, 1=yakın
+        float y = vWorldPos.y / 8.0;
+
+        // Domain-warped FBM: her katman bir öncekini bükuyor
+        float n1 = fbm(vec2(z * 2.5  - uTime * 0.08,  y * 1.5  + uTime * 0.05));
+        float n2 = fbm(vec2(z * 5.0  + uTime * 0.13  + n1 * 0.8, y * 3.0 - uTime * 0.09));
+        float n3 = fbm(vec2(z * 3.5  - uTime * 0.06  + n2 * 0.5, y * 2.0 + uTime * 0.07));
+        float g  = n1 * 0.50 + n2 * 0.30 + n3 * 0.20;
+
+        // Renk paleti: derin lacivert → elektrik mavi → indigo
+        vec3 c1  = vec3(0.018, 0.028, 0.10);
+        vec3 c2  = vec3(0.040, 0.100, 0.32);
+        vec3 c3  = vec3(0.080, 0.200, 0.52);
+        vec3 col = mix(c1, c2, smoothstep(0.0, 0.45, g));
+        col      = mix(col, c3, smoothstep(0.45, 0.85, g));
+        col      = mix(col, c2 * 0.7, smoothstep(0.75, 1.0, g) * n3);
+
+        // Koridor derinliği: uzaklaştıkça kararır
+        col *= (0.22 + z * 0.78);
+
+        // Üst/alt kenar karartması
+        col *= (0.35 + smoothstep(0.0, 0.20, y) * smoothstep(1.0, 0.80, y) * 0.65);
+
+        col *= 4.0; // genel parlaklık — ince ayar buradan
+        gl_FragColor = vec4(col, 1.0);
+      }
+    `,
   });
-
-  // Moving gradient: iki örtüşen sinüs dalgası Z boyunca kayıyor
-  roomMat.onBeforeCompile = (shader) => {
-    shader.uniforms.uTime = wallUniforms.uTime;
-    shader.vertexShader = shader.vertexShader.replace(
-      'void main() {',
-      `varying vec3 vWorldPos;\nvoid main() {`,
-    );
-    shader.vertexShader = shader.vertexShader.replace(
-      '#include <begin_vertex>',
-      `#include <begin_vertex>
-vWorldPos = (modelMatrix * vec4(position, 1.0)).xyz;`,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      'void main() {',
-      `uniform float uTime;\nvarying vec3 vWorldPos;\nvoid main() {`,
-    );
-    shader.fragmentShader = shader.fragmentShader.replace(
-      'vec3 totalEmissiveRadiance = emissive;',
-      `float _z  = clamp((vWorldPos.z + 80.0) / 90.0, 0.0, 1.0);
-float _w1 = sin(_z * 7.0 - uTime * 0.45) * 0.5 + 0.5;
-float _w2 = sin(_z * 3.2 + uTime * 0.28 + 1.4) * 0.35 + 0.65;
-float _m  = 0.55 + _w1 * _w2 * 0.9;
-vec3 totalEmissiveRadiance = emissive * _m;`,
-    );
-  };
-  roomMat.customProgramCacheKey = () => 'holm_wall_gradient';
   const room = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 102), roomMat);
   room.position.set(0, 4, -39);
   room.receiveShadow = true;
@@ -80,11 +107,11 @@ vec3 totalEmissiveRadiance = emissive * _m;`,
 
   // Zemin — hafif yansımalı
   const floorMat = new THREE.MeshStandardMaterial({
-    color:             0x1a1a22, // gri-mavi
-    roughness:         0.88,
-    metalness:         0.08,
-    emissive:          new THREE.Color(0x111118), // gri glow
-    emissiveIntensity: 6.0, // ince ayar buradan
+    color:             0x252530, // açık gri-mavi
+    roughness:         0.85,
+    metalness:         0.10,
+    emissive:          new THREE.Color(0x181820), // gri glow
+    emissiveIntensity: 10.0, // ince ayar buradan
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), floorMat);
   floor.rotation.x = -Math.PI / 2;
@@ -97,10 +124,10 @@ vec3 totalEmissiveRadiance = emissive * _m;`,
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —
   // fiziksel modelde ~50-100x çarpan gerekiyor.
 
-  const ambient = new THREE.AmbientLight(0x203050, 55.0);  // ince ayar — modellere vuran taban ışık
+  const ambient = new THREE.AmbientLight(0x203050, 75.0);  // ince ayar — modellere vuran taban ışık
   scene.add(ambient);
 
-  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 40.0); // ince ayar — orijinal 26
+  const hemi = new THREE.HemisphereLight(0x304060, 0x080810, 55.0); // ince ayar — orijinal 26
   scene.add(hemi);
 
   // Spotlight aktif modeli takip eder — pozisyon/target main.js'de lerp'leniyor
