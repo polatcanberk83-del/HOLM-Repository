@@ -559,9 +559,9 @@ async function boot() {
   dissolveLoadingScreen();
 
   if (wordmarkEl) {
-    gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 1.8, ease: "power2.out" });
+    gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 4.0, ease: "power2.out" });
   }
-  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 2.1, ease: "power2.out" });
+  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 4.5, ease: "power2.out" });
 
   const ctaBtn = document.querySelector(".proj-cta");
   if (ctaBtn) {
@@ -636,7 +636,7 @@ function dissolveLoadingScreen() {
   ctx.shadowBlur = 22; ctx.fill(); ctx.shadowBlur = 8;
 
   // ── Animate crack growth ──────────────────────────────────────────
-  const CRACK_MS = 460;
+  const CRACK_MS = 1100;
   const t0 = performance.now();
 
   function drawCracks(now) {
@@ -667,7 +667,7 @@ function dissolveLoadingScreen() {
     }
 
     if (t < 1) requestAnimationFrame(drawCracks);
-    else        setTimeout(shatterTiles, 240); // hold cracks visible then shatter
+    else        setTimeout(shatterTiles, 620); // hold cracks visible then shatter
   }
   requestAnimationFrame(drawCracks);
 
@@ -717,21 +717,21 @@ function dissolveLoadingScreen() {
 
     // Hide loading screen — tiles show the same visual
     loadingEl.style.display = 'none';
-    // Fade crack lines out as pieces start moving
-    gsap.to(crackCv, { opacity: 0, duration: 0.45, onComplete: () => crackCv.remove() });
+    // Crack lines linger then fade as pieces drift away
+    gsap.to(crackCv, { opacity: 0, duration: 1.1, delay: 0.3, onComplete: () => crackCv.remove() });
 
-    // Shatter from center outward — matches glass-break physics
+    // Shatter from center outward — cinematic slow start, accelerating exit
     gsap.to(tiles, {
-      x:         () => (Math.random() - 0.5) * vw * 2.2,
-      y:         () => (Math.random() - 0.5) * vh * 2.2,
-      rotationX: () => (Math.random() - 0.5) * 520,
-      rotationY: () => (Math.random() - 0.5) * 520,
-      rotationZ: () => (Math.random() - 0.5) * 240,
-      scale:     () => 0.02 + Math.random() * 0.10,
+      x:         () => (Math.random() - 0.5) * vw * 2.4,
+      y:         () => (Math.random() - 0.5) * vh * 2.4,
+      rotationX: () => (Math.random() - 0.5) * 560,
+      rotationY: () => (Math.random() - 0.5) * 560,
+      rotationZ: () => (Math.random() - 0.5) * 260,
+      scale:     () => 0.01 + Math.random() * 0.08,
       opacity:   0,
-      duration:  1.15,
-      stagger:   { each: 0.011, from: 'center', grid: [ROWS, COLS] },
-      ease:      'power3.in',
+      duration:  2.0,
+      stagger:   { each: 0.018, from: 'center', grid: [ROWS, COLS] },
+      ease:      'power2.in',
       onComplete: () => container.remove(),
     });
   }
