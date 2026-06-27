@@ -5,21 +5,15 @@ import gsap from "gsap";
 import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel }            from "./three/loader.js";
-import { createCurtain }        from "./three/curtain.js";
+import { IntroLoader }          from "./introLoader.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
   SHATTER_T_DISSOLVE_END,
 } from "./three/shatter.js";
 
-// Real loading progress — lerped in tick() so bar is always smooth
-let _realProgress = 0;
-let _dispProgress = 0;
-const _ldFill = document.getElementById('ld-fill');
-const _ldPct  = document.getElementById('ld-percent');
-
 // ---------- Device detection (must precede MODEL_DEFS) ----------
-const isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
+const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
 
 // ---------- Model tanımları ----------
 const MODEL_CAPTIONS = {
@@ -43,7 +37,6 @@ const MODEL_DEFS = [
 const canvas          = document.getElementById("scene-canvas");
 const captionEl       = document.getElementById("caption");
 const gatheringTextEl = document.getElementById("gathering-text");
-const loadingEl       = document.getElementById("loading");
 const wordmarkEl      = document.querySelector(".wordmark");
 const scrollHintEl    = document.getElementById("scroll-hint");
 const diamondCursor   = document.getElementById("diamond-cursor");
@@ -51,27 +44,27 @@ const diamondCursor   = document.getElementById("diamond-cursor");
 // ---------- Three.js ----------
 const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms, onResize } = createScene(canvas, isMobile);
 
-// Base light intensities (must match scene.js) — driven down during gathering effect
-const AMBIENT_INTENSITY_BASE  =  75.0;
-const HEMI_INTENSITY_BASE     =  55.0;
-const ARM_REVEAL_INTENSITY    = 900.0;
-const ARM_CRYSTAL_Z           = -48;
-const SPOT_INTENSITY_BASE     =  30.0;
+// Base light intensities — driven down during gathering effect
+const AMBIENT_INTENSITY_BASE = 75.0;
+const HEMI_INTENSITY_BASE    = 55.0;
+const ARM_REVEAL_INTENSITY   = 900.0;
+const ARM_CRYSTAL_Z          = -48;
+const SPOT_INTENSITY_BASE    = 30.0;
+
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 const shatter   = createShatterEffect(renderer, scene, camera, isMobile);
 let _shatterCaptured = false;
 
-// WebGL curtain — covers scene during loading, opens like vertical blinds
-const curtain = createCurtain(renderer, isMobile);
-let _curtainActive = true;
+// Cloth-tear intro loader — scene/camera props accessed in tick()
+const introLoader = new IntroLoader();
 
 // ---------- Custom cursor + glow trail ----------
 let _mouseNX = 0.5, _mouseNY = 0.5;
 
-const TRAIL_COUNT = 14;
-const _trailEls   = [];
-let   _trailIdx   = 0;
+const TRAIL_COUNT  = 14;
+const _trailEls    = [];
+let   _trailIdx    = 0;
 let   _lastTrailMs = 0;
 
 if (!isMobile) {
@@ -99,14 +92,14 @@ if (!isMobile && diamondCursor) {
       const el = _trailEls[_trailIdx % TRAIL_COUNT];
       _trailIdx++;
       el.style.transition = "none";
-      el.style.left    = e.clientX + "px";
-      el.style.top     = e.clientY + "px";
-      el.style.opacity = "0.8";
-      el.style.transform = "translate(-50%, -50%) scale(1)";
-      el.offsetHeight;
+      el.style.left       = e.clientX + "px";
+      el.style.top        = e.clientY + "px";
+      el.style.opacity    = "0.8";
+      el.style.transform  = "translate(-50%, -50%) scale(1)";
+      el.offsetHeight; // force reflow
       el.style.transition = "opacity 0.55s ease-out, transform 0.55s ease-out";
-      el.style.opacity   = "0";
-      el.style.transform = "translate(-50%, -50%) scale(0.1)";
+      el.style.opacity    = "0";
+      el.style.transform  = "translate(-50%, -50%) scale(0.1)";
     }
   });
 }
@@ -200,41 +193,31 @@ canvas.addEventListener("pointermove", e => {
 canvas.addEventListener("pointerleave", () => pointer.set(-9, -9));
 
 // ---------- Dust Particles ----------
-let dustGeometry = null;
-let dustPositions = null;
-let dustInitialPositions = null;
-let dustPoints = null;
-const PARTICLE_COUNT = 600;
+let dustGeometry          = null;
+let dustPositions         = null;
+let dustInitialPositions  = null;
+let dustPoints            = null;
+const PARTICLE_COUNT      = 600;
 
 function createDustParticles() {
   dustGeometry = new THREE.BufferGeometry();
-  dustPositions = new Float32Array(PARTICLE_COUNT * 3);
+  dustPositions        = new Float32Array(PARTICLE_COUNT * 3);
   dustInitialPositions = new Float32Array(PARTICLE_COUNT * 3);
 
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     const x = (Math.random() - 0.5) * 16;
     const y = Math.random() * 7;
     const z = 5 - Math.random() * 65;
-
-    dustPositions[i * 3 + 0] = x;
-    dustPositions[i * 3 + 1] = y;
-    dustPositions[i * 3 + 2] = z;
-
-    dustInitialPositions[i * 3 + 0] = x;
-    dustInitialPositions[i * 3 + 1] = y;
-    dustInitialPositions[i * 3 + 2] = z;
+    dustPositions[i*3]     = dustInitialPositions[i*3]     = x;
+    dustPositions[i*3 + 1] = dustInitialPositions[i*3 + 1] = y;
+    dustPositions[i*3 + 2] = dustInitialPositions[i*3 + 2] = z;
   }
 
   dustGeometry.setAttribute("position", new THREE.BufferAttribute(dustPositions, 3));
-
   const dustMaterial = new THREE.PointsMaterial({
-    size: 0.015,
-    color: 0x8090c0,
-    transparent: true,
-    opacity: 0.35,
-    depthWrite: false,
+    size: 0.015, color: 0x8090c0,
+    transparent: true, opacity: 0.35, depthWrite: false,
   });
-
   dustPoints = new THREE.Points(dustGeometry, dustMaterial);
   scene.add(dustPoints);
 }
@@ -244,14 +227,9 @@ function animateDust(elapsed) {
   const pos = dustGeometry.attributes.position;
   for (let i = 0; i < PARTICLE_COUNT; i++) {
     const ix = i * 3;
-
     pos.array[ix + 1] += 0.001;
-
-    const initX = dustInitialPositions[ix + 0];
-    const initZ = dustInitialPositions[ix + 2];
-    pos.array[ix + 0] = initX + Math.sin(elapsed * 0.3 + i * 0.17) * 0.08;
-    pos.array[ix + 2] = initZ + Math.cos(elapsed * 0.2 + i * 0.13) * 0.05;
-
+    pos.array[ix + 0] = dustInitialPositions[ix]     + Math.sin(elapsed * 0.3 + i * 0.17) * 0.08;
+    pos.array[ix + 2] = dustInitialPositions[ix + 2] + Math.cos(elapsed * 0.2 + i * 0.13) * 0.05;
     if (pos.array[ix + 1] > 7) {
       pos.array[ix + 1] = 0;
       dustInitialPositions[ix + 1] = 0;
@@ -267,7 +245,6 @@ let heroCanvasModel = null;
 // ---------- Per-model key light intensities — escalating toward model 5 ----------
 const MODEL_KEY_INTENSITIES = [155, 255, 390, 580, 1190];
 
-// Shared pedestal material
 const _pedMat = new THREE.MeshStandardMaterial({
   color: 0x0d0d0f, roughness: 0.9, metalness: 0.1,
 });
@@ -323,9 +300,7 @@ async function loadOneModel(def, modelIdx) {
       shatter.setHeroCanvas(model);
     }
 
-    const ped = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.4, 0.5, 0.3, 32), _pedMat,
-    );
+    const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.3, 32), _pedMat);
     ped.position.set(0, 0.15, def.z);
     ped.castShadow = ped.receiveShadow = true;
     scene.add(ped);
@@ -364,15 +339,18 @@ function showProjection() {
 }
 
 function hideProjection() {
-  gsap.to(projOverlay, { opacity: 0, duration: 0.5, onComplete: () => {
-    projOverlay.classList.remove("active");
-    projPlane.visible = false;
-    gsap.set(".proj-line, .proj-cta", { opacity: 0, y: 0 });
-  }});
+  gsap.to(projOverlay, {
+    opacity: 0, duration: 0.5,
+    onComplete: () => {
+      projOverlay.classList.remove("active");
+      projPlane.visible = false;
+      gsap.set(".proj-line, .proj-cta", { opacity: 0, y: 0 });
+    },
+  });
 }
 
 // ---------- Lenis ----------
-if (isMobile) scrollHintEl.textContent = 'SWIPE TO EXPLORE';
+if (isMobile) scrollHintEl.textContent = "SWIPE TO EXPLORE";
 const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
   touchMultiplier: 0.65,
@@ -384,7 +362,7 @@ const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
 });
 gsap.ticker.lagSmoothing(0);
-lenis.stop(); // locked until curtain reveal completes
+lenis.stop(); // locked until cloth-tear reveal completes
 
 let _scrollHintHidden = false;
 lenis.on("scroll", ({ scroll, limit }) => {
@@ -396,22 +374,14 @@ lenis.on("scroll", ({ scroll, limit }) => {
 });
 
 // ---------- Render döngüsü ----------
-let _lastTick = 0;
 function tick(now = 0) {
   requestAnimationFrame(tick);
-  _lastTick = now;
-
   lenis.raf(now);
 
   const elapsed = clock.getElapsedTime();
 
-  // Progress bar — smooth lerp toward real progress
-  if (_curtainActive) {
-    _dispProgress += (_realProgress - _dispProgress) * 0.08;
-    const pct = Math.min(Math.round(_dispProgress * 100), 100);
-    if (_ldFill) _ldFill.style.width = pct + '%';
-    if (_ldPct)  _ldPct.textContent  = pct + '%';
-  }
+  // Update cloth wind/progress/ring — must run every frame while active
+  introLoader.update(elapsed);
 
   if (!isMobile) {
     raycaster.setFromCamera(pointer, camera);
@@ -448,7 +418,7 @@ function tick(now = 0) {
     _spotLook.set(0, 3.5, -89.5);
     showCaption("");
     projPlane.material.uniforms.uTime.value = elapsed;
-    if (inProjection && !projectionShown) { projectionShown = true; showProjection(); }
+    if (inProjection && !projectionShown) { projectionShown = true;  showProjection(); }
     if (!inProjection && projectionShown)  { projectionShown = false; hideProjection(); }
   } else if (inOrbit) {
     _lookTarget.set(0, 1.5, near.z);
@@ -474,16 +444,10 @@ function tick(now = 0) {
   spotLight.target.updateMatrixWorld();
 
   const _armDist = Math.hypot(camera.position.x, camera.position.z - ARM_CRYSTAL_Z);
-  const _isAtArm = _armDist < ORBIT_R + 3;
-  armSpot.intensity += ((_isAtArm ? ARM_REVEAL_INTENSITY : 0) - armSpot.intensity) * 0.10;
+  armSpot.intensity += (((_armDist < ORBIT_R + 3 ? ARM_REVEAL_INTENSITY : 0)) - armSpot.intensity) * 0.10;
 
-  if (post.bokeh) {
-    post.bokeh.uniforms["focus"].value = dist;
-  }
-
-  if (post.grainVignette) {
-    post.grainVignette.uniforms.uTime.value = elapsed;
-  }
+  if (post.bokeh)         post.bokeh.uniforms["focus"].value       = dist;
+  if (post.grainVignette) post.grainVignette.uniforms.uTime.value  = elapsed;
   wallUniforms.uTime.value = elapsed;
 
   if (!isMobile) animateDust(elapsed);
@@ -502,18 +466,23 @@ function tick(now = 0) {
   const { bgDark, textOpacity } = shatter.update(effectT);
 
   const brightF = 1 - bgDark * 0.92;
-  ambient.intensity   = AMBIENT_INTENSITY_BASE  * brightF;
-  hemi.intensity      = HEMI_INTENSITY_BASE     * brightF;
-  spotLight.intensity = SPOT_INTENSITY_BASE     * Math.max(brightF, 0.12);
+  ambient.intensity   = AMBIENT_INTENSITY_BASE * brightF;
+  hemi.intensity      = HEMI_INTENSITY_BASE    * brightF;
+  spotLight.intensity = SPOT_INTENSITY_BASE    * Math.max(brightF, 0.12);
 
   if (gatheringTextEl) gatheringTextEl.style.opacity = textOpacity;
-
   if (textOpacity > 0.01) showCaption("");
 
+  // 1. Composer renders the 3D scene + post-processing to screen
   post.composer.render();
 
-  // Curtain renders on top of EffectComposer output until reveal is complete
-  if (_curtainActive) curtain.render(elapsed);
+  // 2. Cloth overlay rendered on top — torn pixels discard → live scene shows through
+  if (introLoader.active) {
+    renderer.autoClear = false;
+    renderer.clearDepth();
+    renderer.render(introLoader.scene, introLoader.camera);
+    renderer.autoClear = true;
+  }
 }
 
 // ---------- Resize ----------
@@ -525,7 +494,6 @@ window.addEventListener("resize", () => {
 // ---------- Boot ----------
 async function boot() {
   const p0 = camPath.getPoint(0);
-
   camera.position.copy(p0);
   camera.position.z += 3;
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
@@ -533,55 +501,52 @@ async function boot() {
 
   if (wordmarkEl) wordmarkEl.style.opacity = "0";
 
-  // Tiny progress floor so bar isn't stuck at 0 on first frame
-  _realProgress = 0.04;
+  // Init intro loader — creates cloth mesh + DOM ring
+  introLoader.init({
+    renderer,
+    composer: post.composer,
+    lenis,
+    isMobile,
+    onComplete() {
+      // Called by IntroLoader after cloth fully tears away
+      gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
+      if (wordmarkEl) gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 1.5, ease: "power2.out" });
+      gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 2.0, ease: "power2.out" });
+    },
+  });
 
-  // Start render loop immediately — curtain covers the scene
+  // Initial progress floor — bar shows immediately, not frozen at 0
+  introLoader.setProgress(0.04);
+
+  // Start RAF — cloth covers the scene from frame 1 (warm-up: ≥2 frames before start() can fire)
   requestAnimationFrame(tick);
 
-  // Critical models: first 3 — loaded before reveal
+  // Load critical models (first 3) with real progress tracking
   const CRITICAL = MODEL_DEFS.slice(0, 3);
   const LAZY     = MODEL_DEFS.slice(3);
 
   for (let i = 0; i < CRITICAL.length; i++) {
     await loadOneModel(CRITICAL[i], i);
-    _realProgress = (i + 1) / CRITICAL.length;
+    introLoader.setProgress((i + 1) / CRITICAL.length);
   }
 
   if (!isMobile) createDustParticles();
 
-  // Snap to 100% and hold so user sees completion
-  _realProgress = 1.0;
+  // Hold at 100% briefly so the full ring is visible
+  introLoader.setProgress(1.0);
   await new Promise(r => setTimeout(r, 520));
 
-  // Grab loader DOM elements to fade before curtain lifts
-  const loaderDomEls = [
-    loadingEl.querySelector('.ld-wordmark'),
-    loadingEl.querySelector('.ld-tagline'),
-    loadingEl.querySelector('.ld-bar-wrap'),
-  ].filter(Boolean);
+  // Fire cloth-tear reveal (guards itself with frame warm-up check)
+  introLoader.start();
 
-  gsap.timeline({
-    onComplete() {
-      _curtainActive = false;
-      curtain.teardown();
-      loadingEl.style.display = 'none';
-      lenis.start();
-      gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
-      if (wordmarkEl) gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 1.5, ease: "power2.out" });
-      gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 2.0, ease: "power2.out" });
-    },
-  })
-  .to(loaderDomEls, { opacity: 0, duration: 0.4, ease: "power2.out" })
-  .to(curtain.uniforms.uProgress, { value: 1.0, duration: 2.6, ease: "power2.inOut" }, "-=0.1");
-
-  // Lazy models load in background after reveal starts
+  // Lazy models load in background while cloth tears
   for (let i = 0; i < LAZY.length; i++) {
     loadOneModel(LAZY[i], CRITICAL.length + i).catch(err =>
-      console.error('[HOLM] lazy load failed', err)
+      console.error("[HOLM] lazy load failed", err),
     );
   }
 
+  // CTA button magnetic hover
   const ctaBtn = document.querySelector(".proj-cta");
   if (ctaBtn) {
     ctaBtn.addEventListener("mousemove", e => {
@@ -590,10 +555,9 @@ async function boot() {
       const ny = (e.clientY - r.top  - r.height * 0.5) / r.height;
       gsap.to(ctaBtn, { x: nx * 14, y: ny * 9, duration: 0.35, ease: "power2.out" });
     });
-    ctaBtn.addEventListener("mouseleave", () => {
-      gsap.to(ctaBtn, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.45)" });
-    });
-
+    ctaBtn.addEventListener("mouseleave", () =>
+      gsap.to(ctaBtn, { x: 0, y: 0, duration: 0.7, ease: "elastic.out(1, 0.45)" }),
+    );
     if (!isMobile && diamondCursor) {
       ctaBtn.addEventListener("mouseenter", () => diamondCursor.classList.add("hovering"));
       ctaBtn.addEventListener("mouseleave", () => diamondCursor.classList.remove("hovering"));
