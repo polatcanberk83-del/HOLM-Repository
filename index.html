@@ -207,43 +207,6 @@
           inset 0 0 20px rgba(180, 210, 255, 0.04);
       }
 
-      /* ── Cursor glow trail ───────────────────────────────────────── */
-      .cursor-trail {
-        position: fixed;
-        pointer-events: none;
-        z-index: 9998;
-        width: 5px;
-        height: 5px;
-        border-radius: 50%;
-        background: rgba(180, 210, 255, 0.9);
-        box-shadow: 0 0 8px 3px rgba(140, 180, 255, 0.45);
-        transform: translate(-50%, -50%) scale(1);
-        will-change: opacity, transform;
-      }
-
-      /* ── Diamond Cursor ──────────────────────────────────────────── */
-      #diamond-cursor {
-        position: fixed;
-        pointer-events: none;
-        z-index: 9999;
-        top: -40px; left: -40px;
-        transform: translate(-50%, -50%);
-        transition: transform 0.18s cubic-bezier(0.23, 1, 0.32, 1);
-        will-change: transform, top, left;
-      }
-      #diamond-cursor polygon {
-        transition: stroke 0.2s ease, stroke-width 0.2s ease;
-      }
-      #diamond-cursor.hovering {
-        transform: translate(-50%, -50%) scale(1.4);
-      }
-      #diamond-cursor.hovering polygon {
-        stroke: #e8f0ff;
-        stroke-width: 1.5;
-      }
-      #diamond-cursor.model-hover {
-        transform: translate(-50%, -50%) scale(1.2);
-      }
 
       #crosshair { display: none; }
       #free-hint { display: none; }
@@ -351,7 +314,6 @@
           letter-spacing: 0.14em;
         }
         .proj-cta-text-hover { display: none; }
-        #diamond-cursor { display: none; }
       }
 
       /* ── Small phones (≤375px) ───────────────────────────────────── */
@@ -432,7 +394,7 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-BSBHjEJf.js"></script>
+    <script type="module" crossorigin src="/assets/index-CZnCM_SD.js"></script>
   </head>
   <body>
 
@@ -489,11 +451,7 @@
     <!-- Gathering sequence -->
     <div id="gathering-text">Gathering the pieces, one by one.</div>
 
-    <div id="diamond-cursor">
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-        <polygon points="10,1 19,10 10,19 1,10" stroke="#c8d8ff" stroke-width="1" fill="none"/>
-      </svg>
-    </div>
+
     <div id="crosshair"></div>
 
     <div class="scroll-spacer"></div>
