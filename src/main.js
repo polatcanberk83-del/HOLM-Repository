@@ -11,6 +11,17 @@ import {
   SHATTER_T_DISSOLVE_END,
 } from "./three/shatter.js";
 
+// Loading: split-letter reveal — GSAP controls y/opacity, CSS handles aurora gradient
+{
+  const _lc = document.querySelectorAll('.ld-c');
+  gsap.set(_lc, { opacity: 0, y: 32, filter: 'blur(10px)' });
+  gsap.set('.ld-c--dia', { scale: 1.35, y: 32 });
+  gsap.to(_lc, {
+    opacity: 1, y: 0, filter: 'blur(0px)',
+    duration: 1.0, stagger: 0.14, ease: 'power3.out', delay: 0.5,
+  });
+}
+
 // ---------- Device detection (must precede MODEL_DEFS) ----------
 const isMobile = window.innerWidth < 768 || 'ontouchstart' in window;
 

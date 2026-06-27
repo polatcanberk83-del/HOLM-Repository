@@ -108,7 +108,7 @@
         pointer-events: none;
       }
 
-      /* ── Loading — Awwwards gradient reveal ──────────────────────── */
+      /* ── Loading — split-letter reveal ──────────────────────────── */
       .loading-screen {
         position: fixed;
         inset: 0;
@@ -125,156 +125,74 @@
         pointer-events: none;
       }
 
-      /* Gradient orbs */
-      .ld-orb {
-        position: absolute;
-        border-radius: 50%;
-        filter: blur(88px);
-        opacity: 0;
-        pointer-events: none;
-        will-change: opacity, transform;
-      }
-
-      .ld-orb--a {
-        width: 130vmax; height: 130vmax;
-        left: -35vmax; bottom: -35vmax;
-        background: radial-gradient(circle at 38% 62%,
-          rgba(11, 24, 96, 0.98) 0%,
-          rgba(6, 12, 58, 0.72) 42%,
-          transparent 70%);
-        animation: ld-orb-a 2.8s cubic-bezier(0.16, 1, 0.3, 1) 0.08s both;
-      }
-
-      .ld-orb--b {
-        width: 88vmax; height: 88vmax;
-        right: -24vmax; top: -24vmax;
-        background: radial-gradient(circle at 62% 38%,
-          rgba(28, 12, 112, 0.84) 0%,
-          rgba(16, 7, 68, 0.52) 45%,
-          transparent 70%);
-        animation: ld-orb-b 2.2s cubic-bezier(0.16, 1, 0.3, 1) 0.28s both;
-      }
-
-      .ld-orb--c {
-        width: 60vmax; height: 60vmax;
-        left: 50%; top: 50%;
-        background: radial-gradient(circle at center,
-          rgba(30, 62, 210, 0.40) 0%,
-          rgba(18, 38, 148, 0.22) 42%,
-          transparent 70%);
-        animation: ld-orb-c 2.5s cubic-bezier(0.16, 1, 0.3, 1) 0.52s both;
-      }
-
-      @keyframes ld-orb-a {
-        0%   { opacity: 0; transform: scale(0.30) translate(-4%, 5%); }
-        42%  { opacity: 0.70; }
-        100% { opacity: 0.60; transform: scale(1) translate(0, 0); }
-      }
-      @keyframes ld-orb-b {
-        0%   { opacity: 0; transform: scale(0.36); }
-        100% { opacity: 0.50; transform: scale(1); }
-      }
-      @keyframes ld-orb-c {
-        0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.06); }
-        52%  { opacity: 0.48; transform: translate(-50%, -50%) scale(1.14); }
-        100% { opacity: 0.35; transform: translate(-50%, -50%) scale(1); }
-      }
-
-      /* Scan line — drops top → center, tempo-synced with logo reveal */
-      .ld-scan {
-        position: absolute;
-        left: 0; right: 0;
-        height: 1px;
-        background: linear-gradient(90deg,
-          transparent 0%,
-          rgba(78, 132, 255, 0.26) 8%,
-          rgba(138, 188, 255, 0.88) 32%,
-          rgba(208, 232, 255, 1.00) 50%,
-          rgba(138, 188, 255, 0.88) 68%,
-          rgba(78, 132, 255, 0.26) 92%,
-          transparent 100%);
-        box-shadow: 0 0 14px 4px rgba(108, 164, 255, 0.30);
-        top: -2px;
-        opacity: 0;
-        pointer-events: none;
-        animation: ld-scan 1.5s linear 0.26s forwards;
-      }
-
-      @keyframes ld-scan {
-        0%   { top: -2px;  opacity: 0; }
-        4%   { opacity: 1; }
-        86%  { opacity: 0.72; }
-        100% { top: 54vh;  opacity: 0; }
-      }
-
-      /* Secondary subtle sweep — diagonal echo */
-      .ld-sweep {
+      /* Atmospheric gradient backdrop */
+      .ld-bg {
         position: absolute;
         inset: 0;
-        opacity: 0;
-        pointer-events: none;
-        background: linear-gradient(
-          108deg,
-          transparent 22%,
-          rgba(44, 82, 210, 0.10) 42%,
-          rgba(88, 138, 255, 0.06) 52%,
-          transparent 68%
-        );
-        background-size: 220% 100%;
-        background-position: -220% 0;
-        animation: ld-sweep 1.6s cubic-bezier(0.25, 0.46, 0.45, 0.94) 0.52s forwards;
+        background:
+          radial-gradient(ellipse 115% 80% at 10% 90%,
+            rgba(7, 18, 85, 0.97) 0%, transparent 50%),
+          radial-gradient(ellipse 85% 72% at 90% 10%,
+            rgba(26, 8, 106, 0.84) 0%, transparent 50%),
+          radial-gradient(ellipse 55% 55% at 50% 50%,
+            rgba(14, 36, 148, 0.26) 0%, transparent 65%);
+        animation: ld-bg-appear 1.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+      @keyframes ld-bg-appear {
+        from { opacity: 0; transform: scale(1.08); }
+        to   { opacity: 1; transform: scale(1.00); }
       }
 
-      @keyframes ld-sweep {
-        0%   { opacity: 0; background-position: -220% 0; }
-        18%  { opacity: 1; }
-        82%  { opacity: 0.65; }
-        100% { opacity: 0; background-position: 120% 0; }
-      }
-
-      /* Logo */
+      /* Logo container — glow lives here */
       .ld-logo {
         position: relative;
         z-index: 2;
         display: flex;
-        align-items: baseline;
-        gap: 0.18em;
-        opacity: 0;
-        will-change: opacity, filter, transform;
-        animation: ld-logo-in 1.05s cubic-bezier(0.16, 1, 0.3, 1) 1.02s both;
+        align-items: center;
+        gap: 0.01em;
+        filter:
+          drop-shadow(0 0 20px rgba(80, 145, 255, 0.58))
+          drop-shadow(0 0 64px rgba(54, 106, 255, 0.20));
       }
 
-      @keyframes ld-logo-in {
-        0%   { opacity: 0; filter: blur(14px); transform: translateY(10px); }
-        100% { opacity: 1; filter: blur(0px);  transform: translateY(0); }
-      }
-
-      .ld-holm {
+      /* Each letter — aurora gradient, GSAP controls opacity/y */
+      .ld-c {
+        display: inline-block;
         font-family: 'Fraunces', serif;
         font-weight: 300;
         font-style: normal;
-        font-size: clamp(3.8rem, 9.5vw, 8rem);
-        letter-spacing: 0.1em;
+        font-size: clamp(4rem, 9.5vw, 8.5rem);
+        letter-spacing: -0.01em;
         line-height: 1;
-        background: linear-gradient(138deg,
-          rgba(145, 185, 255, 0.90) 0%,
-          rgba(205, 226, 255, 1.00) 36%,
-          rgba(175, 212, 255, 0.96) 64%,
-          rgba(128, 170, 255, 0.88) 100%
+        opacity: 0;
+
+        background: linear-gradient(108deg,
+          hsl(232, 100%, 62%) 0%,
+          hsl(215, 100%, 71%) 18%,
+          hsl(202, 95%, 82%) 34%,
+          hsl(208, 100%, 94%) 50%,
+          hsl(200, 88%, 81%) 66%,
+          hsl(220, 100%, 69%) 82%,
+          hsl(244, 90%, 59%) 100%
         );
+        background-size: 400% 100%;
         -webkit-background-clip: text;
         background-clip: text;
         -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 28px rgba(92, 145, 255, 0.40));
+
+        animation: ld-aurora 3.5s ease-in-out 0.3s infinite alternate;
+        will-change: transform, opacity, filter;
       }
 
-      .ld-dia {
-        font-family: serif;
-        font-size: clamp(1.4rem, 3.2vw, 2.8rem);
-        color: rgba(145, 198, 255, 0.60);
-        line-height: 1;
-        position: relative;
-        top: -0.06em;
+      /* Aurora shift — same phase on all letters = unified gradient feel */
+      @keyframes ld-aurora {
+        from { background-position: 0%   50%; }
+        to   { background-position: 100% 50%; }
+      }
+
+      /* Diamond: GSAP sets scale(1.35) to visually match cap height */
+      .ld-c--dia {
+        margin-left: 0.16em;
       }
 
       /* ── Projection overlay ──────────────────────────────────────── */
@@ -488,9 +406,7 @@
       /* ── Mobile (≤767px) ─────────────────────────────────────────── */
       @media (max-width: 767px) {
         /* Loading */
-        .ld-holm { font-size: clamp(2.8rem, 16vw, 4.5rem); }
-        .ld-dia  { font-size: clamp(1.1rem, 6vw, 1.8rem); }
-        .ld-orb  { filter: blur(60px); }
+        .ld-c { font-size: clamp(2.8rem, 14vw, 4.5rem); }
 
         /* Caption */
         .caption-layer { bottom: 14vh; }
@@ -544,7 +460,7 @@
 
       /* ── Small phones (≤375px) ───────────────────────────────────── */
       @media (max-width: 375px) {
-        .ld-holm { font-size: clamp(2.4rem, 18vw, 3.2rem); }
+        .ld-c { font-size: clamp(2.2rem, 16vw, 3.5rem); }
         .caption { font-size: clamp(0.78rem, 4.2vw, 0.95rem); }
         .proj-line { font-size: clamp(0.76rem, 3.8vw, 0.9rem); }
       }
@@ -626,17 +542,13 @@
 
     <!-- ── Loading screen ─────────────────────────────────────────── -->
     <div class="loading-screen" id="loading">
-      <!-- Gradient orbs -->
-      <div class="ld-orb ld-orb--a"></div>
-      <div class="ld-orb ld-orb--b"></div>
-      <div class="ld-orb ld-orb--c"></div>
-      <!-- Diagonal colour sweep -->
-      <div class="ld-sweep"></div>
-      <!-- Scan line — drops from top, triggers logo -->
-      <div class="ld-scan"></div>
-      <!-- Logo: Fraunces 300 non-italic + diamond -->
+      <div class="ld-bg"></div>
       <div class="ld-logo">
-        <span class="ld-holm">HOLM</span><span class="ld-dia">◆</span>
+        <span class="ld-c">H</span>
+        <span class="ld-c">O</span>
+        <span class="ld-c">L</span>
+        <span class="ld-c">M</span>
+        <span class="ld-c ld-c--dia">◆</span>
       </div>
     </div>
 
