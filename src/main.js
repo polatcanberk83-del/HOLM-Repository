@@ -59,13 +59,19 @@ let _shatterCaptured = false;
 const introLoader = new IntroLoader();
 
 // ---------- Liquid cursor — spring-tracked mouse ----------
-let _tgtX = 0.5, _tgtY = 0.5;
-let _sprX = 0.5, _sprY = 0.5;
+let _tgtX = -2, _tgtY = -2; // off-screen until first move
+let _sprX = -2, _sprY = -2;
+let _mouseActive = false;
 
 if (!isMobile) {
   window.addEventListener("mousemove", e => {
     _tgtX = e.clientX / window.innerWidth;
     _tgtY = e.clientY / window.innerHeight;
+    if (!_mouseActive) {
+      _sprX = _tgtX;
+      _sprY = _tgtY;
+      _mouseActive = true;
+    }
   });
 }
 

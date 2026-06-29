@@ -51,11 +51,11 @@ const LiquidCursorShader = {
       float dist = length(d);
 
       // Subtle blob that breathes slowly
-      float radius = 0.12 + sin(uTime * 0.42) * 0.006;
+      float radius = 0.072 + sin(uTime * 0.42) * 0.003;
 
       // Two noise layers shift the edge in different directions — organic morphing boundary
-      float n1 = liqNoise(uv * 2.2)  * 0.030;
-      float n2 = liqNoise2(uv * 1.8) * 0.022;
+      float n1 = liqNoise(uv * 2.2)  * 0.018;
+      float n2 = liqNoise2(uv * 1.8) * 0.013;
       float eDist = dist + n1 + n2;
 
       if (eDist < radius) {
