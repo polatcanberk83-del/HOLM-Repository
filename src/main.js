@@ -5,7 +5,6 @@ import gsap from "gsap";
 import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel }            from "./three/loader.js";
-import { IntroLoader }          from "./introLoader.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
@@ -54,26 +53,6 @@ const post      = createPostProcessing(renderer, scene, camera, isMobile);
 const projPlane = createProjectionPlane(scene);
 const shatter   = createShatterEffect(renderer, scene, camera, isMobile);
 let _shatterCaptured = false;
-
-// Cloth-tear intro loader — scene/camera props accessed in tick()
-const introLoader = new IntroLoader();
-
-// ---------- Liquid cursor — spring-tracked mouse ----------
-let _tgtX = -2, _tgtY = -2; // off-screen until first move
-let _sprX = -2, _sprY = -2;
-let _mouseActive = false;
-
-if (!isMobile) {
-  window.addEventListener("mousemove", e => {
-    _tgtX = e.clientX / window.innerWidth;
-    _tgtY = e.clientY / window.innerHeight;
-    if (!_mouseActive) {
-      _sprX = _tgtX;
-      _sprY = _tgtY;
-      _mouseActive = true;
-    }
-  });
-}
 
 // ---------- Orbit sabitleri ----------
 const CAM_H   = 1.8;
@@ -333,8 +312,6 @@ const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
 });
 gsap.ticker.lagSmoothing(0);
-lenis.stop(); // locked until cloth-tear reveal completes
-
 let _scrollHintHidden = false;
 lenis.on("scroll", ({ scroll, limit }) => {
   splineT = limit > 0 ? scroll / limit : 0;
@@ -350,9 +327,6 @@ function tick(now = 0) {
   lenis.raf(now);
 
   const elapsed = clock.getElapsedTime();
-
-  // Update cloth wind/progress/ring — must run every frame while active
-  introLoader.update(elapsed);
 
   if (!isMobile) {
     raycaster.setFromCamera(pointer, camera);
@@ -421,13 +395,6 @@ function tick(now = 0) {
   if (post.grainVignette) post.grainVignette.uniforms.uTime.value  = elapsed;
   wallUniforms.uTime.value = elapsed;
 
-  if (!isMobile && post.liquid) {
-    _sprX += (_tgtX - _sprX) * 0.055;
-    _sprY += (_tgtY - _sprY) * 0.055;
-    post.liquid.uniforms.uMouse.value.set(_sprX, 1.0 - _sprY);
-    post.liquid.uniforms.uTime.value = elapsed;
-  }
-
   if (!isMobile) animateDust(elapsed);
 
   const effectT = isMobile ? splineTSmooth : splineT;
@@ -447,16 +414,7 @@ function tick(now = 0) {
   if (gatheringTextEl) gatheringTextEl.style.opacity = textOpacity;
   if (textOpacity > 0.01) showCaption("");
 
-  // 1. Composer renders the 3D scene + post-processing to screen
   post.composer.render();
-
-  // 2. Cloth overlay rendered on top — torn pixels discard → live scene shows through
-  if (introLoader.active) {
-    renderer.autoClear = false;
-    renderer.clearDepth();
-    renderer.render(introLoader.scene, introLoader.camera);
-    renderer.autoClear = true;
-  }
 }
 
 // ---------- Resize ----------
@@ -473,42 +431,16 @@ async function boot() {
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
   camera.lookAt(_lookNow);
 
-  if (wordmarkEl) wordmarkEl.style.opacity = "0";
-
-  // Init intro loader — creates cloth mesh + DOM ring
-  introLoader.init({
-    renderer,
-    composer: post.composer,
-    lenis,
-    isMobile,
-    onComplete() {
-      // Called by IntroLoader after cloth fully tears away
-      gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
-      if (wordmarkEl) gsap.to(wordmarkEl, { opacity: 0.85, duration: 1.4, delay: 1.5, ease: "power2.out" });
-      gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 2.0, ease: "power2.out" });
-    },
-  });
-
-  // Initial progress floor so diamond ring isn't frozen at 0 on first frame
-  introLoader.setProgress(0.03);
-
-  // Start RAF — cloth covers scene from frame 1 (≥2 frames required before start())
   requestAnimationFrame(tick);
 
-  // Load ALL models before reveal — "tamamen hazır olana kadar"
   for (let i = 0; i < MODEL_DEFS.length; i++) {
     await loadOneModel(MODEL_DEFS[i], i);
-    introLoader.setProgress((i + 1) / MODEL_DEFS.length);
   }
 
   if (!isMobile) createDustParticles();
 
-  // Hold at 100% so the completed diamond is fully visible before tearing
-  introLoader.setProgress(1.0);
-  await new Promise(r => setTimeout(r, 600));
-
-  // Fire cloth-tear reveal
-  introLoader.start();
+  gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
+  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 0.5, ease: "power2.out" });
 
   // CTA button magnetic hover
   const ctaBtn = document.querySelector(".proj-cta");
