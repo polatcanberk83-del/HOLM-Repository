@@ -1,0 +1,77 @@
+/* ═══ HOLM cinematic preloader ═══════════════════════════════════════ */
+
+.holm-loader {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  pointer-events: none;
+  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
+  color: rgba(220, 232, 250, 0.96);
+  overflow: hidden;
+}
+
+.holm-loader__frame {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 0 12vh 0;
+  clip-path: polygon(50% -60%, 160% 50%, 50% 160%, -60% 50%);
+  will-change: clip-path;
+}
+
+.holm-loader__counter {
+  display: flex;
+  align-items: baseline;
+  gap: 0.12em;
+  font-weight: 300;
+  font-style: italic;
+  font-size: clamp(2.4rem, 7.2vw, 5.4rem);
+  letter-spacing: 0.02em;
+  line-height: 1;
+  transform-origin: center;
+  will-change: transform, opacity;
+}
+
+.holm-loader__num {
+  color: rgba(230, 240, 255, 0.94);
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.holm-loader__pct {
+  font-size: 0.42em;
+  opacity: 0.55;
+  letter-spacing: 0.18em;
+  transform: translateY(-0.4em);
+}
+
+/* ─── Shatter shards ──────────────────────────────────────────────── */
+
+.holm-loader__shards {
+  position: absolute;
+  inset: 0;
+  perspective: 1400px;
+  perspective-origin: 50% 50%;
+  will-change: transform;
+}
+
+.holm-loader__shard {
+  position: absolute;
+  inset: 0;
+  background: var(--holm-loader-bg, #0a1424);
+  transform-origin: center center;
+  backface-visibility: hidden;
+  will-change: transform, opacity;
+}
+
+@media (max-width: 768px) {
+  .holm-loader__counter {
+    font-size: clamp(1.9rem, 12vw, 3.4rem);
+  }
+  .holm-loader__frame {
+    padding-bottom: 15vh;
+  }
+}

@@ -4,7 +4,8 @@ import gsap from "gsap";
 
 import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
 import { createPostProcessing } from "./three/postprocessing.js";
-import { loadModel }            from "./three/loader.js";
+import { loadModel, setLoadingManager } from "./three/loader.js";
+import { Loader }                       from "./loader.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
@@ -431,13 +432,31 @@ async function boot() {
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
   camera.lookAt(_lookNow);
 
-  requestAnimationFrame(tick);
+  // Cinematic preloader — diamond + counter, then clip-collapse, then Voronoi shatter
+  let mainTickStarted = false;
+  const loader = new Loader({
+    renderer,
+    onReveal: () => {
+      if (mainTickStarted) return;
+      mainTickStarted = true;
+      requestAnimationFrame(tick);
+    },
+  });
+
+  // Route GLTF progress into loader's UI counter
+  setLoadingManager(loader.getLoadingManager());
+
+  // Kick off loader visuals + phase gates; models load in parallel below
+  const loaderPromise = loader.run();
 
   for (let i = 0; i < MODEL_DEFS.length; i++) {
     await loadOneModel(MODEL_DEFS[i], i);
   }
 
   if (!isMobile) createDustParticles();
+
+  loader.markComplete();
+  await loaderPromise;
 
   gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
   gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 0.5, ease: "power2.out" });

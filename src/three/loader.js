@@ -7,8 +7,14 @@ const dracoLoader = new DRACOLoader();
 // bunu /public/draco/'ya kopyalayıp yolu değiştiririz
 dracoLoader.setDecoderPath("https://www.gstatic.com/draco/versioned/decoders/1.5.6/");
 
-const gltfLoader = new GLTFLoader();
+let gltfLoader = new GLTFLoader();
 gltfLoader.setDRACOLoader(dracoLoader);
+
+// Called once from main.js before loading — routes progress into loader UI
+export function setLoadingManager(manager) {
+  gltfLoader = new GLTFLoader(manager);
+  gltfLoader.setDRACOLoader(dracoLoader);
+}
 
 const cache = new Map();
 
