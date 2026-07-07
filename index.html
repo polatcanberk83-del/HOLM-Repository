@@ -211,54 +211,7 @@
       #crosshair { display: none; }
       #free-hint { display: none; }
 
-      /* ── Book a Call button ──────────────────────────────────────── */
-      #book-call {
-        position: fixed;
-        top: 5vh;
-        right: 5vw;
-        z-index: 3;
-        font-family: 'Fraunces', serif;
-        font-size: 0.72rem;
-        font-weight: 300;
-        letter-spacing: 0.16em;
-        color: rgba(215, 230, 255, 0.8);
-        border: 1px solid rgba(215, 230, 255, 0.22);
-        padding: 9px 20px;
-        text-decoration: none;
-        pointer-events: auto;
-        overflow: hidden;
-        transition: color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
-        white-space: nowrap;
-      }
-      #book-call::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(105deg,
-          rgba(200, 220, 255, 0.12) 0%,
-          rgba(180, 205, 255, 0.05) 100%);
-        transform: scaleX(0);
-        transform-origin: left center;
-        transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
-      }
-      #book-call:hover::before { transform: scaleX(1); }
-      #book-call:hover {
-        color: rgba(230, 242, 255, 1.0);
-        border-color: rgba(210, 228, 255, 0.6);
-        box-shadow:
-          0 0 24px rgba(170, 205, 255, 0.22),
-          0 0 60px rgba(170, 205, 255, 0.08);
-      }
-      @media (max-width: 767px) {
-        #book-call {
-          font-size: 0.6rem;
-          padding: 7px 14px;
-          letter-spacing: 0.12em;
-          top: calc(5vh - 2px);
-        }
-      }
-
-      /* ── Tablet (768–1024px) ─────────────────────────────────────── */
+/* ── Tablet (768–1024px) ─────────────────────────────────────── */
       @media (max-width: 1024px) and (min-width: 768px) {
         .proj-content { max-width: 420px; }
         .proj-line { font-size: clamp(0.82rem, 1.2vw, 0.98rem); }
@@ -394,8 +347,8 @@
         }
       }
     </style>
-    <script type="module" crossorigin src="/assets/index-B4Nkpsfz.js"></script>
-    <link rel="stylesheet" crossorigin href="/assets/index-ehJXTD5e.css">
+    <script type="module" crossorigin src="/assets/index-DV3vs9ys.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-DkjEdE4n.css">
   </head>
   <body>
 
@@ -418,14 +371,7 @@
       </svg>
     </div>
 
-    <a id="book-call"
-       href="https://cal.com/canberk-polat-dpsl0y/discovery-call"
-       target="_blank"
-       rel="noopener noreferrer">
-      Book a Call
-    </a>
-
-    <div class="caption-layer">
+<div class="caption-layer">
       <div class="caption" id="caption"></div>
     </div>
 
