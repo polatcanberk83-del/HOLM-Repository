@@ -8,6 +8,7 @@
   font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
   color: rgba(220, 232, 250, 0.96);
   overflow: hidden;
+  will-change: mask-image, opacity;
 }
 
 .holm-loader__frame {
@@ -27,11 +28,25 @@
   gap: 0.12em;
   font-weight: 300;
   font-style: italic;
-  font-size: clamp(2.4rem, 7.2vw, 5.4rem);
+  font-size: clamp(2.4rem, 6.8vw, 5.2rem);
   letter-spacing: 0.02em;
   line-height: 1;
   transform-origin: left bottom;
   will-change: transform, opacity;
+}
+
+.holm-loader__num {
+  color: rgba(230, 240, 255, 0.94);
+  min-width: 3ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.holm-loader__pct {
+  font-size: 0.42em;
+  opacity: 0.55;
+  letter-spacing: 0.18em;
+  transform: translateY(-0.4em);
 }
 
 /* ─── Nav / UI hidden during loader ──────────────────────────────── */
@@ -54,44 +69,35 @@ body.holm-loading #gathering-text {
   transition: opacity 0.8s ease;
 }
 
-.holm-loader__num {
-  color: rgba(230, 240, 255, 0.94);
-  min-width: 3ch;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
-.holm-loader__pct {
-  font-size: 0.42em;
-  opacity: 0.55;
-  letter-spacing: 0.18em;
-  transform: translateY(-0.4em);
-}
-
-/* ─── Shatter shards ──────────────────────────────────────────────── */
-
-.holm-loader__shards {
-  position: absolute;
-  inset: 0;
-  perspective: 1400px;
-  perspective-origin: 50% 50%;
-  will-change: transform;
-}
-
-.holm-loader__shard {
-  position: absolute;
-  inset: 0;
-  background: var(--holm-loader-bg, #0a1424);
-  transform-origin: center center;
-  backface-visibility: hidden;
-  will-change: transform, opacity;
-}
-
-@media (max-width: 768px) {
+/* ─── Tablet ─────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .holm-loader__frame {
+    padding: 0 0 5vh 5vw;
+  }
   .holm-loader__counter {
-    font-size: clamp(1.9rem, 12vw, 3.4rem);
+    font-size: clamp(2.1rem, 8vw, 3.8rem);
+  }
+}
+
+/* ─── Phone ──────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .holm-loader__frame {
+    padding: 0 0 4vh 6vw;
+  }
+  .holm-loader__counter {
+    font-size: clamp(1.9rem, 10vw, 3rem);
+  }
+  .holm-loader__pct {
+    font-size: 0.4em;
+  }
+}
+
+/* ─── Landscape short viewports ──────────────────────────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .holm-loader__counter {
+    font-size: clamp(1.6rem, 5vh, 2.4rem);
   }
   .holm-loader__frame {
-    padding-bottom: 15vh;
+    padding-bottom: 4vh;
   }
 }

@@ -1,20 +1,18 @@
 import * as THREE from "three";
 import gsap from "gsap";
-import { Delaunay } from "d3-delaunay";
 import "./loader.css";
 
 // ─── Tunables ────────────────────────────────────────────────────────
 const MIN_DURATION      = 3.0;                   // seconds — patience floor
-const SHARD_COUNT       = 48;
-const IMPACT_POINT      = { x: 0.5, y: 0.5 };    // viewport ratio
-const OVERLAY_BG        = "#000000";             // must match body / shard color
+const OVERLAY_BG        = "#000000";
 
 const COLLAPSE_DURATION = 0.75;
 const COLLAPSE_EASE     = "power3.inOut";
 
-const SHATTER_BURST_DUR = 0.55;                  // outward impulse phase — slower so pieces read
-const SHATTER_FALL_DUR  = 1.55;                  // gravity fall + fade phase
-const SHATTER_STAGGER   = 0.55;                  // wide stagger — pieces cascade
+// Iris reveal — a transparent circle expands from center
+const REVEAL_DURATION   = 1.5;
+const REVEAL_EASE       = "power3.inOut";
+const REVEAL_SOFT_PX    = 60;                    // edge softness of the iris
 
 // ─── Diamond shader — refraction + dispersion + fresnel ─────────────
 const DIAMOND_VERT = /* glsl */`
@@ -182,11 +180,10 @@ export class Loader {
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
     this.camera.position.set(0, 0, 3.9);
 
-    this.overlay        = null;
-    this.frameEl        = null;
-    this.counterEl      = null;
-    this.shardContainer = null;
-    this.diamond        = null;
+    this.overlay   = null;
+    this.frameEl   = null;
+    this.counterEl = null;
+    this.diamond   = null;
 
     this._rafId  = null;
     this._active = false;
@@ -271,125 +268,48 @@ export class Loader {
     });
   }
 
-  // ── Phase 3: Voronoi shatter with physics — gravity + tumble ────
+  // ── Phase 3: iris reveal — transparent circle grows from center ─
   _runPhase3() {
     return new Promise((resolve) => {
-      const w = window.innerWidth;
-      const h = window.innerHeight;
-      const impactPx = { x: IMPACT_POINT.x * w, y: IMPACT_POINT.y * h };
-
-      // Seed points — 70% biased toward impact, 30% scattered
-      const points = [];
-      for (let i = 0; i < SHARD_COUNT; i++) {
-        if (i / SHARD_COUNT < 0.7) {
-          const rad   = Math.sqrt(Math.random()) * Math.min(w, h) * 0.72;
-          const theta = Math.random() * Math.PI * 2;
-          points.push([
-            impactPx.x + Math.cos(theta) * rad,
-            impactPx.y + Math.sin(theta) * rad,
-          ]);
-        } else {
-          points.push([Math.random() * w, Math.random() * h]);
-        }
-      }
-      const clamped = points.map(([x, y]) => [
-        Math.max(0, Math.min(w, x)),
-        Math.max(0, Math.min(h, y)),
-      ]);
-
-      const delaunay = Delaunay.from(clamped);
-      const voronoi  = delaunay.voronoi([0, 0, w, h]);
-
-      const shards = [];
-      for (let i = 0; i < clamped.length; i++) {
-        const cell = voronoi.cellPolygon(i);
-        if (!cell || cell.length < 3) continue;
-
-        const polyStr = cell.map(([x, y]) => `${x.toFixed(1)}px ${y.toFixed(1)}px`).join(", ");
-
-        const el = document.createElement("div");
-        el.className = "holm-loader__shard";
-        el.style.clipPath = `polygon(${polyStr})`;
-
-        let cx = 0, cy = 0;
-        for (const [x, y] of cell) { cx += x; cy += y; }
-        cx /= cell.length; cy /= cell.length;
-
-        // Pivot at cell's centroid → rotation looks like it's tumbling around itself,
-        // not swinging around the middle of the viewport
-        el.style.transformOrigin = `${((cx / w) * 100).toFixed(2)}% ${((cy / h) * 100).toFixed(2)}%`;
-        this.shardContainer.appendChild(el);
-
-        const dx   = cx - impactPx.x;
-        const dy   = cy - impactPx.y;
-        const dist = Math.hypot(dx, dy) || 1;
-
-        shards.push({
-          el,
-          cx, cy, dist,
-          nx: dx / dist,
-          ny: dy / dist,
-        });
-      }
-
-      const maxDist = Math.max(1, ...shards.map((s) => s.dist));
-
-      // Stop the loader render loop, hand canvas off to the main scene
+      // Stop loader RAF, hand canvas to main scene BEFORE the iris opens
       this._active = false;
       if (this._rafId) cancelAnimationFrame(this._rafId);
       if (this._onReveal) this._onReveal();
 
-      const master = gsap.timeline({
+      const overlay = this.overlay;
+      const maxR    = Math.hypot(window.innerWidth, window.innerHeight) * 0.6;
+
+      // Radial gradient mask: transparent inside the growing circle, opaque outside.
+      // As the circle grows, the overlay fades away from the center outward.
+      const applyMask = (r) => {
+        const soft = REVEAL_SOFT_PX;
+        const inner = Math.max(0, r);
+        const outer = r + soft;
+        const mask  = `radial-gradient(circle at 50% 50%, ` +
+                      `transparent ${inner}px, black ${outer}px)`;
+        overlay.style.maskImage       = mask;
+        overlay.style.webkitMaskImage = mask;
+      };
+      applyMask(0);
+
+      const state = { r: 0 };
+      const tl = gsap.timeline({
         onComplete: () => gsap.delayedCall(0.05, resolve),
       });
 
-      shards.forEach((s) => {
-        const delay     = (s.dist / maxDist) * SHATTER_STAGGER;
-        const proximity = 1 - (s.dist / maxDist) * 0.55; // 0.45 – 1.0
+      tl.to(state, {
+        r: maxR,
+        duration: REVEAL_DURATION,
+        ease: REVEAL_EASE,
+        onUpdate: () => applyMask(state.r),
+      }, 0);
 
-        // Tuned so pieces stay largely inside the viewport for the burst,
-        // then arc off-screen only during the gravity fall.
-        const outward = (140 + Math.random() * 190) * proximity;
-        const upKick  = ( 80 + Math.random() * 140) * proximity;
-        const zLiftA  =  90 + Math.random() * 160 * proximity;
-
-        const fall    = 380 + Math.random() * 340;
-        const drift   = (Math.random() - 0.5) * 140;
-        const zLiftB  = 220 + Math.random() * 340 * proximity;
-
-        // Phase A — outward burst + small upward kick + gentle tumble start.
-        // Opacity stays at 1 through the whole burst so shards read clearly.
-        master.to(s.el, {
-          x: s.nx * outward + drift * 0.35,
-          y: s.ny * outward - upKick,
-          z: zLiftA,
-          rotationX: (Math.random() - 0.5) * 45,
-          rotationY: (Math.random() - 0.5) * 45,
-          rotationZ: (Math.random() - 0.5) * 30,
-          duration: SHATTER_BURST_DUR,
-          ease: "power2.out",
-        }, delay);
-
-        // Phase B — gravity fall + heavier tumble; opacity holds most of the
-        // fall and only fades in the last third so we don't lose pieces early
-        master.to(s.el, {
-          x: s.nx * outward * 1.4 + drift,
-          y: s.ny * outward - upKick + fall,
-          z: zLiftB,
-          rotationX: (Math.random() - 0.5) * 260,
-          rotationY: (Math.random() - 0.5) * 260,
-          rotationZ: (Math.random() - 0.5) * 340,
-          duration: SHATTER_FALL_DUR,
-          ease: "power2.in",
-        }, delay + SHATTER_BURST_DUR);
-
-        // Late fade — starts 60% into the fall phase
-        master.to(s.el, {
-          opacity: 0,
-          duration: SHATTER_FALL_DUR * 0.4,
-          ease: "power1.in",
-        }, delay + SHATTER_BURST_DUR + SHATTER_FALL_DUR * 0.6);
-      });
+      // Overlay whole-opacity fade in the last portion — softens any residue
+      tl.to(overlay, {
+        opacity: 0,
+        duration: 0.55,
+        ease: "power2.out",
+      }, REVEAL_DURATION - 0.4);
     });
   }
 
@@ -407,14 +327,12 @@ export class Loader {
           <span class="holm-loader__num">0</span><span class="holm-loader__pct">%</span>
         </div>
       </div>
-      <div class="holm-loader__shards"></div>
     `;
     document.body.appendChild(overlay);
 
-    this.overlay        = overlay;
-    this.frameEl        = overlay.querySelector(".holm-loader__frame");
-    this.counterEl      = overlay.querySelector(".holm-loader__num");
-    this.shardContainer = overlay.querySelector(".holm-loader__shards");
+    this.overlay   = overlay;
+    this.frameEl   = overlay.querySelector(".holm-loader__frame");
+    this.counterEl = overlay.querySelector(".holm-loader__num");
   }
 
   _createDiamond() {
@@ -439,7 +357,14 @@ export class Loader {
 
     this._resize = () => {
       const w = window.innerWidth, h = window.innerHeight;
-      this.camera.aspect = w / h;
+      const aspect = w / h;
+      this.camera.aspect = aspect;
+      // Portrait: pull the camera back so the gem doesn't crop / overflow
+      this.camera.position.z = aspect < 0.75
+        ? 5.6
+        : aspect < 1.0
+          ? 4.6
+          : 3.9;
       this.camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", this._resize);
