@@ -24,18 +24,20 @@ const THICKNESS_MOBILE   = 1.0;
 const CUE_BOB            = 9;          // px yoyo travel
 const CUE_BOB_DUR        = 1.25;       // s
 
-// Beats — each with a scroll range, diamond target (screen-space nx/ny/scale),
-// and text side. y positive = up, x positive = right, in normalized screen units.
+// Beats — each has a diamond target (screen-space nx/ny/scale) and a text side.
+// y positive = up, x positive = right, in normalized screen units.
+// Anchored to DOM sections; a weighted blend of each section's viewport-center
+// distance drives the diamond target so the gem stays aligned with its stanza.
 const BEATS = [
-  { start: 0.00, end: 0.10, x:  0.00, y:  0.00, scale: 1.20, side: null,         hasText: false },
-  { start: 0.10, end: 0.24, x:  0.34, y:  0.03, scale: 1.00, side: "left",       hasText: true  },
-  { start: 0.24, end: 0.38, x: -0.34, y: -0.05, scale: 1.24, side: "right",      hasText: true  },
-  { start: 0.38, end: 0.52, x:  0.00, y:  0.10, scale: 0.62, side: "below",      hasText: true  }, // pressure
-  { start: 0.52, end: 0.66, x:  0.30, y:  0.06, scale: 1.15, side: "left",       hasText: true  },
-  { start: 0.66, end: 0.80, x: -0.28, y: -0.04, scale: 1.28, side: "right",      hasText: true  },
-  { start: 0.80, end: 0.94, x:  0.00, y:  0.02, scale: 1.35, side: "center-below", hasText: true },
-  { start: 0.94, end: 1.00, x:  0.00, y:  0.00, scale: 1.35, side: null,         hasText: false },
+  { x:  0.00, y:  0.00, scale: 1.20, side: null,            hasText: false },  // 0 intro
+  { x:  0.34, y:  0.03, scale: 1.00, side: "left",          hasText: true  },  // 1 R / text L
+  { x: -0.34, y: -0.05, scale: 1.24, side: "right",         hasText: true  },  // 2 L / text R
+  { x:  0.00, y:  0.08, scale: 0.62, side: "left",          hasText: true  },  // 3 pressure small center / text L
+  { x: -0.30, y:  0.06, scale: 1.18, side: "right",         hasText: true  },  // 4 L / text R
+  { x:  0.28, y: -0.04, scale: 1.28, side: "left",          hasText: true  },  // 5 R / text L
+  { x:  0.00, y:  0.02, scale: 1.35, side: "center-below",  hasText: true  },  // 6 center-large / text below
 ];
+const WEIGHT_FALLOFF = 1.0;   // viewport heights — how far a beat's anchor influences the blend
 
 const KEY_COLOR    = 0xfff2dc;
 const FILL_COLOR   = 0x89b0e4;
@@ -147,14 +149,14 @@ export class Philosophy {
     container.className = "holm-philosophy";
     if (this._reducedMotion) container.classList.add("is-reduced-motion");
 
-    const finalIdx = BEATS.findIndex(b => b.side === "center-below");
+    // Text-bearing beats get MANIFESTO stanzas in order
+    let textCounter = 0;
     const beatsHtml = BEATS
-      .filter((b, i) => b.hasText)
-      .map((beat, textIdx) => {
-        // Index into MANIFESTO — same order as text-bearing beats
-        const stanza  = MANIFESTO[textIdx];
-        const isFinal = textIdx === MANIFESTO.length - 1;
-        const scrollIdx = BEATS.indexOf(beat);
+      .map((beat, scrollIdx) => {
+        if (!beat.hasText) return "";
+        const stanza  = MANIFESTO[textCounter];
+        const isFinal = textCounter === MANIFESTO.length - 1;
+        textCounter++;
         return `
           <section class="holm-philosophy__beat"
                    data-beat="${scrollIdx}"
@@ -175,9 +177,9 @@ export class Philosophy {
       <canvas class="holm-philosophy__canvas" aria-hidden="true"></canvas>
       <div class="holm-philosophy__vignette" aria-hidden="true"></div>
 
-      <section class="holm-philosophy__intro" aria-hidden="true">
+      <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true">
         <div class="holm-philosophy__cue">
-          <span class="holm-philosophy__cue-word">scroll</span>
+          <span class="holm-philosophy__cue-word">scroll to discover</span>
           <span class="holm-philosophy__cue-line"></span>
         </div>
       </section>
@@ -196,6 +198,16 @@ export class Philosophy {
     this.canvas    = container.querySelector(".holm-philosophy__canvas");
     this.blocks    = [...container.querySelectorAll(".holm-philosophy__beat")];
     this.scrollCue = container.querySelector(".holm-philosophy__cue");
+
+    // Beat DOM anchors — one element per BEATS entry (intro + each text beat).
+    // Weighted-blend uses each element's viewport-center distance.
+    this._beatEls = [];
+    container.querySelectorAll("[data-beat]").forEach((el) => {
+      const idx = parseInt(el.dataset.beat, 10);
+      if (Number.isFinite(idx) && BEATS[idx]) {
+        this._beatEls.push({ el, beat: BEATS[idx] });
+      }
+    });
 
     if (!this._reducedMotion) {
       const allLines = container.querySelectorAll(".holm-philosophy__line-inner");
@@ -501,26 +513,48 @@ export class Philosophy {
     this.blocks.forEach((b) => this._observer.observe(b));
   }
 
-  // ── Beat interpolation ─────────────────────────────────────────
-  _computeBeatTarget(t) {
-    // Find current beat window
-    for (let i = 0; i < BEATS.length - 1; i++) {
-      const a = BEATS[i], b = BEATS[i + 1];
-      if (t >= a.start && t <= b.start) {
-        const span = b.start - a.start || 1;
-        const lt   = (t - a.start) / span;
-        const eased = lt < 0.5
-          ? 2 * lt * lt
-          : 1 - Math.pow(-2 * lt + 2, 2) / 2;
-        return {
-          x:     a.x     + (b.x     - a.x)     * eased,
-          y:     a.y     + (b.y     - a.y)     * eased,
-          scale: a.scale + (b.scale - a.scale) * eased,
-        };
-      }
+  // ── Beat interpolation — weighted blend over DOM anchors ───────
+  // Each beat's DOM section contributes to the diamond target based on how
+  // close its center is to the viewport center. This keeps the gem aligned
+  // with whichever stanza is currently on screen, and blends smoothly during
+  // transitions — no keyframe midpoint mismatch.
+  _computeBeatTarget() {
+    if (!this._beatEls || this._beatEls.length === 0) {
+      return { x: 0, y: 0, scale: 1.0 };
     }
-    const last = BEATS[BEATS.length - 1];
-    return { x: last.x, y: last.y, scale: last.scale };
+    const vh        = window.innerHeight;
+    const vpCenter  = vh / 2;
+    const maxDist   = vh * WEIGHT_FALLOFF;
+
+    let totalW = 0;
+    let wx = 0, wy = 0, ws = 0;
+
+    for (const { el, beat } of this._beatEls) {
+      const rect  = el.getBoundingClientRect();
+      const cy    = rect.top + rect.height / 2;
+      const dist  = Math.abs(cy - vpCenter);
+      const raw   = Math.max(0, 1 - dist / maxDist);
+      const w     = raw * raw * (3 - 2 * raw);  // smoothstep
+
+      totalW += w;
+      wx += beat.x     * w;
+      wy += beat.y     * w;
+      ws += beat.scale * w;
+    }
+
+    if (totalW < 0.001) {
+      // No beat within falloff — snap to the nearest by center distance
+      let bestIdx = 0, bestDist = Infinity;
+      this._beatEls.forEach(({ el }, i) => {
+        const rect = el.getBoundingClientRect();
+        const cy   = rect.top + rect.height / 2;
+        const d    = Math.abs(cy - vpCenter);
+        if (d < bestDist) { bestDist = d; bestIdx = i; }
+      });
+      const b = this._beatEls[bestIdx].beat;
+      return { x: b.x, y: b.y, scale: b.scale };
+    }
+    return { x: wx / totalW, y: wy / totalW, scale: ws / totalW };
   }
 
   // ── Render loop ─────────────────────────────────────────────────
@@ -537,10 +571,10 @@ export class Philosophy {
       // Idle spin — never stops
       this._idleSpin += IDLE_SPIN_SPEED * dt;
 
-      // Beat target
+      // Beat target — weighted blend of DOM-anchored beat sections
       const target = this._reducedMotion
         ? { x: 0, y: 0, scale: 1.2 }
-        : this._computeBeatTarget(this._scrollT);
+        : this._computeBeatTarget();
 
       // World-space transform
       const halfFov = (this.camera.fov * Math.PI) / 360;
