@@ -15,8 +15,8 @@
   inset: 0;
   display: flex;
   align-items: flex-end;
-  justify-content: center;
-  padding: 0 0 12vh 0;
+  justify-content: flex-start;
+  padding: 0 0 6vh 6vw;
   clip-path: polygon(50% -60%, 160% 50%, 50% 160%, -60% 50%);
   will-change: clip-path;
 }
@@ -30,8 +30,28 @@
   font-size: clamp(2.4rem, 7.2vw, 5.4rem);
   letter-spacing: 0.02em;
   line-height: 1;
-  transform-origin: center;
+  transform-origin: left bottom;
   will-change: transform, opacity;
+}
+
+/* ─── Nav / UI hidden during loader ──────────────────────────────── */
+
+body.holm-loading .wordmark,
+body.holm-loading #book-call,
+body.holm-loading .scroll-hint,
+body.holm-loading .proj-cta,
+body.holm-loading #caption,
+body.holm-loading #gathering-text {
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
+
+/* Smooth fade-back once the loader releases the class */
+.wordmark,
+#book-call,
+.scroll-hint,
+.proj-cta {
+  transition: opacity 0.8s ease;
 }
 
 .holm-loader__num {

@@ -7,7 +7,7 @@ import "./loader.css";
 const MIN_DURATION      = 3.0;                   // seconds — patience floor
 const SHARD_COUNT       = 48;
 const IMPACT_POINT      = { x: 0.5, y: 0.5 };    // viewport ratio
-const OVERLAY_BG        = "#0a1424";             // must match body / shard color
+const OVERLAY_BG        = "#000000";             // must match body / shard color
 
 const COLLAPSE_DURATION = 0.75;
 const COLLAPSE_EASE     = "power3.inOut";
@@ -85,7 +85,7 @@ export class Loader {
 
     this.scene  = new THREE.Scene();
     this.camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
-    this.camera.position.set(0, 0, 4.4);
+    this.camera.position.set(0, 0, 3.9);
 
     this.overlay        = null;
     this.frameEl        = null;
@@ -267,6 +267,8 @@ export class Loader {
   // ── Setup helpers ────────────────────────────────────────────────
 
   _createDOM() {
+    document.body.classList.add("holm-loading");
+
     const overlay = document.createElement("div");
     overlay.className = "holm-loader";
     overlay.style.setProperty("--holm-loader-bg", OVERLAY_BG);
@@ -361,6 +363,7 @@ export class Loader {
 
   _destroy() {
     this._active = false;
+    document.body.classList.remove("holm-loading");
     if (this._rafId) cancelAnimationFrame(this._rafId);
     if (this._resize) window.removeEventListener("resize", this._resize);
     if (this.diamond) {
