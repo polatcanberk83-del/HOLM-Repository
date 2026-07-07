@@ -6,6 +6,7 @@ import { createScene, createHalo, createProjectionPlane } from "./three/scene.js
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel, setLoadingManager } from "./three/loader.js";
 import { Loader }                       from "./loader.js";
+import { Menu }                         from "./menu.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
@@ -317,6 +318,16 @@ const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
 });
 gsap.ticker.lagSmoothing(0);
+
+// Dev-only room-guide menu — production ships with the "Book a call" button
+// visible instead. On localhost we mount the menu and hide book-a-call so
+// dev navigation to other pages still works.
+if (import.meta.env.DEV) {
+  const menu = new Menu({ lenis });
+  menu.mount();
+  const bookCall = document.getElementById("book-call");
+  if (bookCall) bookCall.style.display = "none";
+}
 
 let _scrollHintHidden = false;
 lenis.on("scroll", ({ scroll, limit }) => {
