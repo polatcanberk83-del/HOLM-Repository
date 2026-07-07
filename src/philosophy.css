@@ -8,32 +8,13 @@
   isolation: isolate;
 }
 
-/* ─── Hero background title — huge watermark BEHIND the diamond ─── */
-.holm-philosophy__hero-title {
-  position: absolute;
-  top: 6vh;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 0;
-  font-family: var(--holm-display-font, 'Fraunces', serif);
-  font-weight: 300;
-  font-style: italic;
-  font-size: clamp(14vw, 22vw, 34vh);
-  line-height: 0.85;
-  letter-spacing: -0.02em;
-  color: rgba(220, 232, 250, 0.075);
-  pointer-events: none;
-  user-select: none;
-  white-space: nowrap;
-}
-
-/* ─── WebGL layer ────────────────────────────────────────────────── */
+/* ─── WebGL layer (canvas draws the diamond + the hero watermark plane) ─ */
 .holm-philosophy__canvas {
   position: fixed;
   inset: 0;
   width: 100vw;
   height: 100vh;
-  z-index: 1;
+  z-index: 0;
   display: block;
   pointer-events: none;
 }
@@ -42,7 +23,7 @@
 .holm-philosophy__vignette {
   position: fixed;
   inset: 0;
-  z-index: 2;
+  z-index: 1;
   pointer-events: none;
   background: radial-gradient(
     ellipse at center,
@@ -55,7 +36,7 @@
 /* ─── Intro (holds only the scroll cue) ─────────────────────────── */
 .holm-philosophy__intro {
   position: relative;
-  z-index: 3;
+  z-index: 2;
   height: 100vh;
   pointer-events: none;
 }
@@ -97,7 +78,7 @@
 /* ─── Beats — each 100vh scroll section ─────────────────────────── */
 .holm-philosophy__beats {
   position: relative;
-  z-index: 3;
+  z-index: 2;
 }
 
 .holm-philosophy__beat {
@@ -161,7 +142,7 @@
 /* ─── Closing affordance ────────────────────────────────────────── */
 .holm-philosophy__end {
   position: relative;
-  z-index: 3;
+  z-index: 2;
   padding: 8vh 0 14vh;
   text-align: center;
 }

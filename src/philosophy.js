@@ -65,8 +65,9 @@ export class Philosophy {
     this.camera    = null;
     this.diamond   = null;
     this.envMap    = null;
-    this._lights   = [];
-    this._glow     = null;             // radial aura sprite
+    this._lights    = [];
+    this._glow      = null;            // radial aura sprite
+    this._heroPlane = null;            // philosophy watermark plane
 
     // DOM
     this.container = null;
@@ -127,6 +128,11 @@ export class Philosophy {
       this._glow.geometry.dispose();
       this._glow.material.dispose();
     }
+    if (this._heroPlane) {
+      this._heroPlane.geometry.dispose();
+      this._heroPlane.material.map?.dispose();
+      this._heroPlane.material.dispose();
+    }
     if (this.envMap) this.envMap.dispose();
     for (const l of this._lights) this.scene?.remove(l);
 
@@ -174,7 +180,6 @@ export class Philosophy {
       }).join("");
 
     container.innerHTML = `
-      <div class="holm-philosophy__hero-title" aria-hidden="true">philosophy</div>
       <canvas class="holm-philosophy__canvas" aria-hidden="true"></canvas>
       <div class="holm-philosophy__vignette" aria-hidden="true"></div>
 
@@ -217,22 +222,22 @@ export class Philosophy {
   }
 
   // ── Three.js ────────────────────────────────────────────────────
-  _createThree() {
     this.renderer = new THREE.WebGLRenderer({
       canvas:           this.canvas,
       antialias:        true,
-      alpha:            true,           // transparent so the hero title reads through
+      alpha:            false,
       powerPreference:  "high-performance",
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.5 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.setClearColor(0x000000, 0);
     this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    // No scene.background — canvas stays transparent so the hero title shows through
+    // Opaque black background — gives the diamond's transmission something
+    // to refract against so it doesn't come back white
+    this.scene.background = new THREE.Color(0x000000);
 
     this.camera = new THREE.PerspectiveCamera(
       36, window.innerWidth / window.innerHeight, 0.1, 100,
@@ -251,8 +256,56 @@ export class Philosophy {
     // Diamond
     this._createDiamond();
 
+    // "philosophy" watermark plane behind the gem
+    this._createHeroPlane();
+
     // Lights
     this._addLights();
+  }
+
+  _createHeroPlane() {
+    const cv  = document.createElement("canvas");
+    cv.width  = 2560;
+    cv.height = 640;
+    const ctx = cv.getContext("2d");
+
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, cv.width, cv.height);
+
+    ctx.fillStyle = "rgba(224, 236, 255, 0.24)";
+    ctx.font = "italic 300 480px 'Fraunces', 'Times New Roman', serif";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("philosophy", cv.width / 2, cv.height / 2 + 30);
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter  = THREE.LinearFilter;
+    tex.magFilter  = THREE.LinearFilter;
+    tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
+
+    const mat = new THREE.MeshBasicMaterial({
+      map:         tex,
+      transparent: true,
+      depthWrite:  false,
+      opacity:     1.0,
+    });
+
+    // Size the plane to comfortably fill the visible area at its depth.
+    // Camera is at z=CAM_Z_BASE, plane sits at z=-8 → distance = camZ+8.
+    const HERO_Z = -8;
+    const dist   = CAM_Z_BASE - HERO_Z;
+    const halfFov = (this.camera.fov * Math.PI) / 360;
+    const halfH   = Math.tan(halfFov) * dist;
+    const halfW   = halfH * this.camera.aspect;
+    const width   = Math.max(halfW * 2 * 1.15, 20);
+    const height  = width / (cv.width / cv.height);
+
+    const geo = new THREE.PlaneGeometry(width, height);
+    this._heroPlane = new THREE.Mesh(geo, mat);
+    this._heroPlane.position.z = HERO_Z;
+    this._heroPlane.renderOrder = -1;
+    this.scene.add(this._heroPlane);
   }
 
   _buildProceduralEnv() {
@@ -605,6 +658,15 @@ export class Philosophy {
         this._glow.position.z = -0.6;
         const gs = curS * 4.4;
         this._glow.scale.set(gs, gs, 1);
+      }
+
+      // Hero watermark plane — visible on the intro, fades as the user
+      // scrolls into the manifesto so it doesn't compete with the stanzas
+      if (this._heroPlane) {
+        const introFade = Math.max(0, 1 - this._scrollT * 4.0);
+        const eased     = introFade * introFade * (3 - 2 * introFade);
+        this._heroPlane.material.opacity = eased;
+        this._heroPlane.visible = eased > 0.005;
       }
 
       // Rotation — idle spin + slight tilt driven by scroll
