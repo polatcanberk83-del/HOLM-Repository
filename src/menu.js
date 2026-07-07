@@ -122,7 +122,6 @@ export class Menu {
             </li>
           `).join("")}
         </ol>
-        <div class="holm-menu__status">Available — İzmir, GMT+3</div>
       </div>
     `;
     document.body.appendChild(container);
