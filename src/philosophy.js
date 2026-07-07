@@ -174,6 +174,7 @@ export class Philosophy {
       }).join("");
 
     container.innerHTML = `
+      <div class="holm-philosophy__hero-title" aria-hidden="true">philosophy</div>
       <canvas class="holm-philosophy__canvas" aria-hidden="true"></canvas>
       <div class="holm-philosophy__vignette" aria-hidden="true"></div>
 
@@ -220,17 +221,18 @@ export class Philosophy {
     this.renderer = new THREE.WebGLRenderer({
       canvas:           this.canvas,
       antialias:        true,
-      alpha:            false,
+      alpha:            true,           // transparent so the hero title reads through
       powerPreference:  "high-performance",
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.5 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.renderer.setClearColor(0x000000, 0);
     this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 1.15;
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.scene.background = new THREE.Color(0x000000);
+    // No scene.background — canvas stays transparent so the hero title shows through
 
     this.camera = new THREE.PerspectiveCamera(
       36, window.innerWidth / window.innerHeight, 0.1, 100,
