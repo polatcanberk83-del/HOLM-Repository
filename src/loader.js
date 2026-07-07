@@ -12,9 +12,9 @@ const OVERLAY_BG        = "#000000";             // must match body / shard colo
 const COLLAPSE_DURATION = 0.75;
 const COLLAPSE_EASE     = "power3.inOut";
 
-const SHATTER_DURATION  = 0.95;
-const SHATTER_STAGGER   = 0.35;
-const SHATTER_EASE      = "power3.in";
+const SHATTER_BURST_DUR = 0.28;                  // outward impulse phase
+const SHATTER_FALL_DUR  = 1.05;                  // gravity fall + fade phase
+const SHATTER_STAGGER   = 0.30;                  // delay range across shards
 
 // ─── Diamond shader — refraction + dispersion + fresnel ─────────────
 const DIAMOND_VERT = /* glsl */`
@@ -176,7 +176,7 @@ export class Loader {
     });
   }
 
-  // ── Phase 3: Voronoi shatter reveals main scene ─────────────────
+  // ── Phase 3: Voronoi shatter with physics — gravity + tumble ────
   _runPhase3() {
     return new Promise((resolve) => {
       const w = window.innerWidth;
@@ -215,51 +215,77 @@ export class Loader {
         const el = document.createElement("div");
         el.className = "holm-loader__shard";
         el.style.clipPath = `polygon(${polyStr})`;
-        this.shardContainer.appendChild(el);
 
         let cx = 0, cy = 0;
         for (const [x, y] of cell) { cx += x; cy += y; }
         cx /= cell.length; cy /= cell.length;
 
+        // Pivot at cell's centroid → rotation looks like it's tumbling around itself,
+        // not swinging around the middle of the viewport
+        el.style.transformOrigin = `${((cx / w) * 100).toFixed(2)}% ${((cy / h) * 100).toFixed(2)}%`;
+        this.shardContainer.appendChild(el);
+
         const dx   = cx - impactPx.x;
         const dy   = cy - impactPx.y;
-        const dist = Math.hypot(dx, dy);
+        const dist = Math.hypot(dx, dy) || 1;
 
-        shards.push({ el, dx, dy, dist });
+        shards.push({
+          el,
+          cx, cy, dist,
+          nx: dx / dist,
+          ny: dy / dist,
+        });
       }
 
-      // Stop loader's render loop before handing off
+      const maxDist = Math.max(1, ...shards.map((s) => s.dist));
+
+      // Stop the loader render loop, hand canvas off to the main scene
       this._active = false;
       if (this._rafId) cancelAnimationFrame(this._rafId);
-
-      // Hand off canvas to main scene — shards cover it, so no flash
       if (this._onReveal) this._onReveal();
 
-      const maxDist = Math.max(1, ...shards.map((s) => s.dist));
-      const tl = gsap.timeline({
-        onComplete: () => {
-          gsap.delayedCall(0.05, resolve);
-        },
+      const master = gsap.timeline({
+        onComplete: () => gsap.delayedCall(0.05, resolve),
       });
 
       shards.forEach((s) => {
-        const delay = (s.dist / maxDist) * SHATTER_STAGGER;
-        const norm  = s.dist || 1;
-        const force = 90 + Math.random() * 260;
-        const nx    = s.dx / norm;
-        const ny    = s.dy / norm;
+        const delay     = (s.dist / maxDist) * SHATTER_STAGGER;
+        const proximity = 1 - (s.dist / maxDist) * 0.6;   // 0.4 – 1.0
 
-        tl.to(s.el, {
-          x: nx * force,
-          y: ny * force + 30,
-          z: 260 + Math.random() * 480,
-          rotationX: (Math.random() - 0.5) * 90,
-          rotationY: (Math.random() - 0.5) * 90,
-          rotationZ: (Math.random() - 0.5) * 55,
-          opacity: 0,
-          duration: SHATTER_DURATION,
-          ease: SHATTER_EASE,
+        // Radial impulse magnitudes
+        const outward   = (280 + Math.random() * 340) * proximity;
+        const upKick    = (140 + Math.random() * 220) * proximity;
+        const zLiftA    = 140 + Math.random() * 260 * proximity;
+
+        // After the burst, gravity pulls further along the same direction
+        const fall      = 620 + Math.random() * 520;
+        const drift     = (Math.random() - 0.5) * 180;
+        const zLiftB    = 320 + Math.random() * 520 * proximity;
+
+        // Phase A — outward burst + slight upward kick + fast tumble start
+        master.to(s.el, {
+          x: s.nx * outward + drift * 0.35,
+          y: s.ny * outward - upKick,
+          z: zLiftA,
+          rotationX: (Math.random() - 0.5) * 55,
+          rotationY: (Math.random() - 0.5) * 55,
+          rotationZ: (Math.random() - 0.5) * 40,
+          duration: SHATTER_BURST_DUR,
+          ease: "power2.out",
         }, delay);
+
+        // Phase B — gravity fall + tumble continues + fade
+        master.to(s.el, {
+          x: s.nx * outward * 1.35 + drift,
+          y: s.ny * outward - upKick + fall,
+          z: zLiftB,
+          rotationX: (Math.random() - 0.5) * 320,
+          rotationY: (Math.random() - 0.5) * 320,
+          rotationZ: (Math.random() - 0.5) * 420,
+          opacity: 0,
+          duration: SHATTER_FALL_DUR,
+          ease: "power2.in",
+        }, delay + SHATTER_BURST_DUR);
       });
     });
   }
