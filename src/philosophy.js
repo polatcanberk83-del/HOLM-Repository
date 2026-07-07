@@ -301,10 +301,8 @@ export class Philosophy {
     cv.height = 640;
     const ctx = cv.getContext("2d");
 
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, cv.width, cv.height);
-
-    ctx.fillStyle = "rgba(224, 236, 255, 0.24)";
+    // Canvas defaults to fully transparent — only draw the text, no rectangle
+    ctx.fillStyle = "rgba(224, 236, 255, 0.28)";
     ctx.font = "italic 300 480px 'Fraunces', 'Times New Roman', serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
