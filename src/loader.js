@@ -12,9 +12,9 @@ const OVERLAY_BG        = "#000000";             // must match body / shard colo
 const COLLAPSE_DURATION = 0.75;
 const COLLAPSE_EASE     = "power3.inOut";
 
-const SHATTER_BURST_DUR = 0.28;                  // outward impulse phase
-const SHATTER_FALL_DUR  = 1.05;                  // gravity fall + fade phase
-const SHATTER_STAGGER   = 0.30;                  // delay range across shards
+const SHATTER_BURST_DUR = 0.55;                  // outward impulse phase — slower so pieces read
+const SHATTER_FALL_DUR  = 1.55;                  // gravity fall + fade phase
+const SHATTER_STAGGER   = 0.55;                  // wide stagger — pieces cascade
 
 // ─── Diamond shader — refraction + dispersion + fresnel ─────────────
 const DIAMOND_VERT = /* glsl */`
@@ -31,45 +31,157 @@ varying vec3 vWorldPos;
 uniform float uTime;
 uniform float uAlpha;
 
-// Procedural environment gradient — sky above, warm horizon, cool below
+// Cinematic procedural env — cool sky, warm rim, subtle stars for sparkle catch
 vec3 sampleEnv(vec3 dir) {
-  float t   = dir.y * 0.5 + 0.5;
-  vec3 sky  = mix(vec3(0.03, 0.06, 0.14), vec3(0.55, 0.72, 0.95), t);
-  float warm = smoothstep(0.42, 0.78, 1.0 - abs(dir.y));
-  warm *= 0.5 + 0.5 * sin(dir.x * 3.2 + uTime * 0.35);
-  sky  += vec3(0.85, 0.42, 0.16) * warm * 0.22;
-  // subtle high-frequency sparkle
-  sky  += 0.05 * sin(dir.x * 42.0 + uTime * 1.8) * sin(dir.z * 42.0 - uTime * 1.2);
+  float t    = dir.y * 0.5 + 0.5;
+  vec3 lowSky  = vec3(0.015, 0.028, 0.06);
+  vec3 midSky  = vec3(0.20, 0.32, 0.55);
+  vec3 highSky = vec3(0.72, 0.85, 1.05);
+
+  vec3 sky = mix(lowSky, midSky, smoothstep(0.0, 0.55, t));
+  sky      = mix(sky,     highSky, smoothstep(0.55, 1.0, t));
+
+  // warm horizon glow — golden fringe near the equator
+  float horiz = 1.0 - abs(dir.y);
+  float warm  = pow(smoothstep(0.35, 0.95, horiz), 2.2);
+  sky += vec3(1.10, 0.50, 0.18) * warm * 0.55;
+
+  // key-light hotspot — moves slowly so facets catch it as the gem turns
+  vec3  keyDir  = normalize(vec3(sin(uTime * 0.35) * 0.7, 0.55, cos(uTime * 0.35) * 0.7));
+  float keyFall = pow(max(dot(dir, keyDir), 0.0), 24.0);
+  sky += vec3(1.4, 1.25, 1.05) * keyFall * 0.9;
+
+  // secondary cool fill from opposite side
+  vec3  fillDir  = vec3(-keyDir.x, 0.2, -keyDir.z);
+  float fillFall = pow(max(dot(dir, fillDir), 0.0), 8.0);
+  sky += vec3(0.35, 0.55, 0.85) * fillFall * 0.35;
+
+  // fine star field — glimmer that reads through the refraction
+  float sparkle = pow(max(0.0,
+      sin(dir.x * 78.0 + uTime * 1.4) *
+      sin(dir.y * 82.0 - uTime * 0.9) *
+      sin(dir.z * 74.0 + uTime * 1.1)
+  ), 20.0);
+  sky += vec3(1.0) * sparkle * 1.4;
+
   return sky;
 }
 
+// Cheap hash for per-fragment jitter → breaks aliasing on the sparkle
+float hash(vec2 p) {
+  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
+}
+
 void main() {
-  // Flat-shaded face normal via screen-space derivatives
+  // Flat-shaded per-facet normal via screen-space derivatives
   vec3 N = normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
   vec3 V = normalize(cameraPosition - vWorldPos);
 
   float ndotv = max(dot(N, V), 0.0);
-  float fres  = pow(1.0 - ndotv, 3.2);
+  float fres  = pow(1.0 - ndotv, 4.5);
 
-  // Chromatic dispersion — three IORs give R/G/B fringes ("fire")
-  vec3 refrR = refract(-V, N, 1.0 / 1.42);
-  vec3 refrG = refract(-V, N, 1.0 / 1.47);
-  vec3 refrB = refract(-V, N, 1.0 / 1.53);
+  // Dispersion — three IORs for R/G/B, wider spread than before
+  vec3 refrR = refract(-V, N, 1.0 / 1.395);
+  vec3 refrG = refract(-V, N, 1.0 / 1.470);
+  vec3 refrB = refract(-V, N, 1.0 / 1.560);
 
+  // Fake secondary internal bounce — reflect the refracted ray off the
+  // opposite facet and sample the env again. Cheap but gives depth.
+  vec3 innerN  = -N;
+  vec3 bounceR = reflect(refrR, innerN);
+  vec3 bounceG = reflect(refrG, innerN);
+  vec3 bounceB = reflect(refrB, innerN);
+
+  float bounceMix = 0.42;
   vec3 refractionColor = vec3(
-    sampleEnv(refrR).r,
-    sampleEnv(refrG).g,
-    sampleEnv(refrB).b
+    mix(sampleEnv(refrR).r, sampleEnv(bounceR).r, bounceMix),
+    mix(sampleEnv(refrG).g, sampleEnv(bounceG).g, bounceMix),
+    mix(sampleEnv(refrB).b, sampleEnv(bounceB).b, bounceMix)
   );
 
   vec3 reflColor = sampleEnv(reflect(-V, N));
 
   vec3 col = mix(refractionColor, reflColor, fres);
-  col += fres * vec3(0.92, 0.96, 1.0) * 0.55;
+
+  // Bright rim — pushes the edge toward white as facets meet the camera
+  col += fres * vec3(0.98, 0.99, 1.05) * 0.85;
+
+  // Body absorption tint — a whisper of blue in the "glass"
+  col *= mix(vec3(0.92, 0.96, 1.02), vec3(1.0), fres);
+
+  // Per-facet micro-sparkle — high-freq flicker only where fresnel is low
+  float jitter = hash(floor(vWorldPos.xz * 8.0) + uTime * 0.15);
+  col += (1.0 - fres) * jitter * vec3(0.15, 0.18, 0.22);
+
+  // Tone curve — subtle contrast boost so the fire pops on dark bg
+  col = pow(col, vec3(0.92));
 
   gl_FragColor = vec4(col, uAlpha);
 }
 `;
+
+// ─── Brilliant-cut diamond geometry ──────────────────────────────────
+// N-sided rings stacked by height; alternating rings rotate half-facet
+// so adjacent facets zig-zag — the shape a "round brilliant" would have.
+function createBrilliantDiamond(N = 16) {
+  const positions = [];
+  const indices   = [];
+  const halfStep  = Math.PI / N;
+
+  //           y      r     angleOffset
+  const layers = [
+    [ 0.55,  0.00,  0            ], // 0 table center (top point)
+    [ 0.55,  0.42,  0            ], // 1 table ring
+    [ 0.36,  0.68,  halfStep     ], // 2 upper crown ring (offset)
+    [ 0.08,  1.00,  0            ], // 3 girdle
+    [-0.18,  0.88,  halfStep     ], // 4 upper pavilion
+    [-0.68,  0.42,  0            ], // 5 lower pavilion
+    [-0.98,  0.00,  0            ], // 6 culet
+  ];
+
+  const ringStarts = [];
+  for (const [y, r, a] of layers) {
+    ringStarts.push(positions.length / 3);
+    if (r === 0) {
+      positions.push(0, y, 0);
+    } else {
+      for (let i = 0; i < N; i++) {
+        const th = (i / N) * Math.PI * 2 + a;
+        positions.push(Math.cos(th) * r, y, Math.sin(th) * r);
+      }
+    }
+  }
+
+  for (let li = 0; li < layers.length - 1; li++) {
+    const [ , r1] = layers[li];
+    const [ , r2] = layers[li + 1];
+    const s1 = ringStarts[li];
+    const s2 = ringStarts[li + 1];
+
+    if (r1 === 0 && r2 > 0) {
+      for (let i = 0; i < N; i++) {
+        const nxt = (i + 1) % N;
+        indices.push(s1, s2 + i, s2 + nxt);
+      }
+    } else if (r1 > 0 && r2 === 0) {
+      for (let i = 0; i < N; i++) {
+        const nxt = (i + 1) % N;
+        indices.push(s1 + i, s1 + nxt, s2);
+      }
+    } else {
+      for (let i = 0; i < N; i++) {
+        const nxt = (i + 1) % N;
+        indices.push(s1 + i,   s1 + nxt, s2 + i);
+        indices.push(s1 + nxt, s2 + nxt, s2 + i);
+      }
+    }
+  }
+
+  const geom = new THREE.BufferGeometry();
+  geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+  geom.setIndex(indices);
+  return geom;
+}
 
 // ─── Loader class ────────────────────────────────────────────────────
 export class Loader {
@@ -250,42 +362,50 @@ export class Loader {
 
       shards.forEach((s) => {
         const delay     = (s.dist / maxDist) * SHATTER_STAGGER;
-        const proximity = 1 - (s.dist / maxDist) * 0.6;   // 0.4 – 1.0
+        const proximity = 1 - (s.dist / maxDist) * 0.55; // 0.45 – 1.0
 
-        // Radial impulse magnitudes
-        const outward   = (280 + Math.random() * 340) * proximity;
-        const upKick    = (140 + Math.random() * 220) * proximity;
-        const zLiftA    = 140 + Math.random() * 260 * proximity;
+        // Tuned so pieces stay largely inside the viewport for the burst,
+        // then arc off-screen only during the gravity fall.
+        const outward = (140 + Math.random() * 190) * proximity;
+        const upKick  = ( 80 + Math.random() * 140) * proximity;
+        const zLiftA  =  90 + Math.random() * 160 * proximity;
 
-        // After the burst, gravity pulls further along the same direction
-        const fall      = 620 + Math.random() * 520;
-        const drift     = (Math.random() - 0.5) * 180;
-        const zLiftB    = 320 + Math.random() * 520 * proximity;
+        const fall    = 380 + Math.random() * 340;
+        const drift   = (Math.random() - 0.5) * 140;
+        const zLiftB  = 220 + Math.random() * 340 * proximity;
 
-        // Phase A — outward burst + slight upward kick + fast tumble start
+        // Phase A — outward burst + small upward kick + gentle tumble start.
+        // Opacity stays at 1 through the whole burst so shards read clearly.
         master.to(s.el, {
           x: s.nx * outward + drift * 0.35,
           y: s.ny * outward - upKick,
           z: zLiftA,
-          rotationX: (Math.random() - 0.5) * 55,
-          rotationY: (Math.random() - 0.5) * 55,
-          rotationZ: (Math.random() - 0.5) * 40,
+          rotationX: (Math.random() - 0.5) * 45,
+          rotationY: (Math.random() - 0.5) * 45,
+          rotationZ: (Math.random() - 0.5) * 30,
           duration: SHATTER_BURST_DUR,
           ease: "power2.out",
         }, delay);
 
-        // Phase B — gravity fall + tumble continues + fade
+        // Phase B — gravity fall + heavier tumble; opacity holds most of the
+        // fall and only fades in the last third so we don't lose pieces early
         master.to(s.el, {
-          x: s.nx * outward * 1.35 + drift,
+          x: s.nx * outward * 1.4 + drift,
           y: s.ny * outward - upKick + fall,
           z: zLiftB,
-          rotationX: (Math.random() - 0.5) * 320,
-          rotationY: (Math.random() - 0.5) * 320,
-          rotationZ: (Math.random() - 0.5) * 420,
-          opacity: 0,
+          rotationX: (Math.random() - 0.5) * 260,
+          rotationY: (Math.random() - 0.5) * 260,
+          rotationZ: (Math.random() - 0.5) * 340,
           duration: SHATTER_FALL_DUR,
           ease: "power2.in",
         }, delay + SHATTER_BURST_DUR);
+
+        // Late fade — starts 60% into the fall phase
+        master.to(s.el, {
+          opacity: 0,
+          duration: SHATTER_FALL_DUR * 0.4,
+          ease: "power1.in",
+        }, delay + SHATTER_BURST_DUR + SHATTER_FALL_DUR * 0.6);
       });
     });
   }
@@ -315,9 +435,9 @@ export class Loader {
   }
 
   _createDiamond() {
-    // Octahedron stretched vertically → classic diamond silhouette
-    const geom = new THREE.OctahedronGeometry(1, 0);
-    geom.scale(0.78, 1.15, 0.78);
+    // Multi-ring brilliant cut — table + crown + girdle + pavilion + culet
+    const geom = createBrilliantDiamond(16);
+    geom.scale(0.82, 0.98, 0.82);
 
     const mat = new THREE.ShaderMaterial({
       vertexShader:   DIAMOND_VERT,
@@ -330,6 +450,8 @@ export class Loader {
     });
 
     this.diamond = new THREE.Mesh(geom, mat);
+    // Tilt slightly toward the viewer so the crown facets catch the key light
+    this.diamond.rotation.x = -0.28;
     this.scene.add(this.diamond);
 
     this._resize = () => {
@@ -372,10 +494,10 @@ export class Loader {
       const pct      = Math.floor(shown * 100);
       if (this.counterEl) this.counterEl.textContent = String(pct);
 
-      // Diamond animation
-      this.diamond.rotation.y += dt * 0.55;
-      this.diamond.rotation.x  = Math.sin(elapsed * 0.7)  * 0.14;
-      this.diamond.rotation.z  = Math.sin(elapsed * 0.42) * 0.08;
+      // Diamond animation — slow gleaming spin, subtle wobble
+      this.diamond.rotation.y += dt * 0.32;
+      this.diamond.rotation.x  = -0.28 + Math.sin(elapsed * 0.45) * 0.08;
+      this.diamond.rotation.z  = Math.sin(elapsed * 0.30) * 0.05;
       this.diamond.material.uniforms.uTime.value = elapsed;
 
       this.renderer.autoClear = true;
