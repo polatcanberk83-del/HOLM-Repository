@@ -49,8 +49,12 @@ const MANIFESTO = [
   ["It is rare. It forms under pressure.",          "The way carbon becomes a diamond."],
   ["So that is the shape we keep returning to.",    "Not decoration. A reminder of what we are after."],
   ["Between sketch and masterpiece,",               "there is patience."],
-  ["This takes time."],
+  ["Ready to create your moment."],
 ];
+
+// Closing CTA — appended after the last stanza inside the final beat
+const CTA_LABEL = "Let's talk";
+const CTA_HREF  = "/contact/";
 
 // ─── Philosophy page controller ──────────────────────────────────────
 export class Philosophy {
@@ -163,17 +167,24 @@ export class Philosophy {
         const stanza  = MANIFESTO[textCounter];
         const isFinal = textCounter === MANIFESTO.length - 1;
         textCounter++;
+        const stanzaLines = stanza.map(line => `
+          <div class="holm-philosophy__line">
+            <span class="holm-philosophy__line-inner">${line}</span>
+          </div>
+        `).join("");
+        const ctaHtml = isFinal ? `
+          <a class="holm-philosophy__cta" href="${CTA_HREF}">
+            <span class="holm-philosophy__cta-label">${CTA_LABEL}</span>
+          </a>
+        ` : "";
         return `
           <section class="holm-philosophy__beat"
                    data-beat="${scrollIdx}"
                    data-side="${beat.side}"
                    data-final="${isFinal}">
             <div class="holm-philosophy__stanza">
-              ${stanza.map(line => `
-                <div class="holm-philosophy__line">
-                  <span class="holm-philosophy__line-inner">${line}</span>
-                </div>
-              `).join("")}
+              ${stanzaLines}
+              ${ctaHtml}
             </div>
           </section>
         `;
@@ -193,10 +204,6 @@ export class Philosophy {
       <main class="holm-philosophy__beats">
         ${beatsHtml}
       </main>
-
-      <div class="holm-philosophy__end">
-        <a class="holm-philosophy__contact" href="/contact/">Contact</a>
-      </div>
     `;
     document.body.appendChild(container);
 
