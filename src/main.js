@@ -51,6 +51,10 @@ const ARM_CRYSTAL_Z          = -48;
 const SPOT_INTENSITY_BASE    = 30.0;
 
 const post      = createPostProcessing(renderer, scene, camera, isMobile);
+
+// Reveal factor — starts at 0 when loader finishes, eases to 1 so the scene
+// gently "wakes up" behind the iris rather than snapping to full brightness.
+let _revealF = 0;
 const projPlane = createProjectionPlane(scene);
 const shatter   = createShatterEffect(renderer, scene, camera, isMobile);
 let _shatterCaptured = false;
@@ -407,10 +411,10 @@ function tick(now = 0) {
 
   const { bgDark, textOpacity } = shatter.update(effectT);
 
-  const brightF = 1 - bgDark * 0.92;
+  const brightF = (1 - bgDark * 0.92) * _revealF;
   ambient.intensity   = AMBIENT_INTENSITY_BASE * brightF;
   hemi.intensity      = HEMI_INTENSITY_BASE    * brightF;
-  spotLight.intensity = SPOT_INTENSITY_BASE    * Math.max(brightF, 0.12);
+  spotLight.intensity = SPOT_INTENSITY_BASE    * Math.max(brightF, 0.12 * _revealF);
 
   if (gatheringTextEl) gatheringTextEl.style.opacity = textOpacity;
   if (textOpacity > 0.01) showCaption("");
@@ -444,15 +448,25 @@ async function boot() {
       mainTickStarted = true;
       requestAnimationFrame(tick);
 
+      // Scene wakes up slowly — 4.2s ramp so lights are still climbing after
+      // the iris is fully open (~2.2s). Prevents "iris then bright scene" jump.
+      const rev = { v: 0 };
+      gsap.to(rev, {
+        v: 1,
+        duration: 4.2,
+        ease: "power2.out",
+        onUpdate: () => { _revealF = rev.v; },
+      });
+
       gsap.to(camera.position, {
         z: p0.z,
-        duration: 3.4,
+        duration: 3.8,
         ease: "power2.out",
       });
       gsap.to(captionEl, {
         opacity: 1,
-        duration: 1.2,
-        delay: 1.8,
+        duration: 1.4,
+        delay: 2.4,
         ease: "power2.out",
       });
     },
