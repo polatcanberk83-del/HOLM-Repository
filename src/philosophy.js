@@ -88,6 +88,15 @@ export class Philosophy {
     this._cueFaded    = false;
     this._cueTween    = null;
 
+    // CTA magnetic
+    this._ctaEl          = null;
+    this._ctaMove        = null;
+    this._ctaLeave       = null;
+    this._ctaSetX        = null;
+    this._ctaSetY        = null;
+    this._ctaInnerSetX   = null;
+    this._ctaInnerSetY   = null;
+
     // Diamond target (world-space) and current smoothed values
     this._targetPos   = new THREE.Vector3();
     this._targetScale = new THREE.Vector3(1, 1, 1);
@@ -108,6 +117,7 @@ export class Philosophy {
     this._bindScroll();
     this._bindResize();
     this._observeBlocks();
+    this._bindCtaMagnetic();
     this._startCue();
     this._startLoop();
   }
@@ -123,6 +133,8 @@ export class Philosophy {
     }
     if (this._observer)  this._observer.disconnect();
     if (this._cueTween)  this._cueTween.kill();
+    if (this._ctaMove)  window.removeEventListener("mousemove", this._ctaMove);
+    if (this._ctaLeave) window.removeEventListener("mouseleave", this._ctaLeave);
 
     if (this.diamond) {
       this.diamond.geometry.dispose();
@@ -173,8 +185,18 @@ export class Philosophy {
           </div>
         `).join("");
         const ctaHtml = isFinal ? `
-          <a class="holm-philosophy__cta" href="${CTA_HREF}">
-            <span class="holm-philosophy__cta-label">${CTA_LABEL}</span>
+          <a class="holm-philosophy__cta" href="${CTA_HREF}" aria-label="${CTA_LABEL}">
+            <span class="holm-philosophy__cta-ring" aria-hidden="true"></span>
+            <span class="holm-philosophy__cta-inner">
+              <span class="holm-philosophy__cta-stack">
+                <span class="holm-philosophy__cta-label">${CTA_LABEL}</span>
+                <span class="holm-philosophy__cta-label holm-philosophy__cta-label--arrow" aria-hidden="true">
+                  <svg viewBox="0 0 24 24" width="1.15em" height="1.15em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M5 12 H19"/><path d="M13 6 L19 12 L13 18"/>
+                  </svg>
+                </span>
+              </span>
+            </span>
           </a>
         ` : "";
         return `
@@ -559,8 +581,12 @@ export class Philosophy {
       entries.forEach((e) => {
         if (!e.isIntersecting || e.target.classList.contains("is-revealed")) return;
         e.target.classList.add("is-revealed");
+        const isFinal = e.target.dataset.final === "true";
+        const cta     = isFinal ? e.target.querySelector(".holm-philosophy__cta") : null;
+
         if (this._reducedMotion) {
           e.target.classList.add("is-in");
+          if (cta) gsap.set(cta, { opacity: 1 });
           return;
         }
         const lines = e.target.querySelectorAll(".holm-philosophy__line-inner");
@@ -571,9 +597,65 @@ export class Philosophy {
           stagger:  0.14,
           ease:     "power3.out",
         });
+        if (cta) {
+          gsap.fromTo(cta,
+            { opacity: 0, scale: 0.85 },
+            { opacity: 1, scale: 1, duration: 0.9, delay: 0.55, ease: "power3.out" },
+          );
+        }
       });
     }, { threshold: 0.35, rootMargin: "0px 0px -8% 0px" });
     this.blocks.forEach((b) => this._observer.observe(b));
+  }
+
+  // ── CTA magnetic hover ─────────────────────────────────────────
+  _bindCtaMagnetic() {
+    if (this._reducedMotion) return;
+    const cta   = this.container.querySelector(".holm-philosophy__cta");
+    const inner = this.container.querySelector(".holm-philosophy__cta-inner");
+    if (!cta || !inner) return;
+
+    this._ctaEl = cta;
+    gsap.set(cta,   { opacity: 0, x: 0, y: 0 });
+    gsap.set(inner, { x: 0, y: 0 });
+
+    // quickTo returns a highly optimized setter for repeated tweens
+    this._ctaSetX      = gsap.quickTo(cta,   "x", { duration: 0.55, ease: "power3" });
+    this._ctaSetY      = gsap.quickTo(cta,   "y", { duration: 0.55, ease: "power3" });
+    this._ctaInnerSetX = gsap.quickTo(inner, "x", { duration: 0.75, ease: "power3" });
+    this._ctaInnerSetY = gsap.quickTo(inner, "y", { duration: 0.75, ease: "power3" });
+
+    this._ctaMove = (e) => {
+      const rect = cta.getBoundingClientRect();
+      const cx   = rect.left + rect.width  / 2;
+      const cy   = rect.top  + rect.height / 2;
+      const dx   = e.clientX - cx;
+      const dy   = e.clientY - cy;
+      const dist = Math.hypot(dx, dy);
+      const R    = rect.width * 1.35;         // magnetic reach: 1.35× radius
+      if (dist > R) {
+        this._ctaSetX(0);      this._ctaSetY(0);
+        this._ctaInnerSetX(0); this._ctaInnerSetY(0);
+        cta.classList.remove("is-magnetic");
+        return;
+      }
+      const pull = (1 - dist / R) * 0.4;
+      this._ctaSetX(dx * pull);
+      this._ctaSetY(dy * pull);
+      // Inner parallax — text drifts opposite for depth
+      this._ctaInnerSetX(dx * pull * 0.35);
+      this._ctaInnerSetY(dy * pull * 0.35);
+      cta.classList.add("is-magnetic");
+    };
+
+    this._ctaLeave = () => {
+      this._ctaSetX(0);      this._ctaSetY(0);
+      this._ctaInnerSetX(0); this._ctaInnerSetY(0);
+      cta.classList.remove("is-magnetic");
+    };
+
+    window.addEventListener("mousemove", this._ctaMove, { passive: true });
+    window.addEventListener("mouseleave", this._ctaLeave);
   }
 
   // ── Beat interpolation — weighted blend over DOM anchors ───────
