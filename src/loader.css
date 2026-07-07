@@ -52,7 +52,7 @@
 /* ─── Nav / UI hidden during loader ──────────────────────────────── */
 
 body.holm-loading .wordmark,
-body.holm-loading #book-call,
+body.holm-loading .holm-menu,
 body.holm-loading .scroll-hint,
 body.holm-loading .proj-cta,
 body.holm-loading #caption,
@@ -63,7 +63,7 @@ body.holm-loading #gathering-text {
 
 /* Smooth fade-back once the loader releases the class */
 .wordmark,
-#book-call,
+.holm-menu,
 .scroll-hint,
 .proj-cta {
   transition: opacity 0.8s ease;

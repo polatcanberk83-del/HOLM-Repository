@@ -6,6 +6,7 @@ import { createScene, createHalo, createProjectionPlane } from "./three/scene.js
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel, setLoadingManager } from "./three/loader.js";
 import { Loader }                       from "./loader.js";
+import { Menu }                         from "./menu.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
@@ -317,6 +318,11 @@ const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
 });
 gsap.ticker.lagSmoothing(0);
+
+// Room-guide menu — replaces the old book-a-call button
+const menu = new Menu({ lenis });
+menu.mount();
+
 let _scrollHintHidden = false;
 lenis.on("scroll", ({ scroll, limit }) => {
   splineT = limit > 0 ? scroll / limit : 0;
