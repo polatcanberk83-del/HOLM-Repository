@@ -149,6 +149,7 @@ export class Philosophy {
       this._heroPlane.material.map?.dispose();
       this._heroPlane.material.dispose();
     }
+    if (this._backdropTex) this._backdropTex.dispose();
     if (this.envMap) this.envMap.dispose();
     for (const l of this._lights) this.scene?.remove(l);
 
@@ -265,9 +266,10 @@ export class Philosophy {
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    // Opaque black background — gives the diamond's transmission something
-    // to refract against so it doesn't come back white
-    this.scene.background = new THREE.Color(0x000000);
+    // Radial depth backdrop — a whisper of navy at center receding to black.
+    // Set as a CanvasTexture on scene.background so the gem's transmission
+    // still has something to refract against (a plain null bg gives it nothing).
+    this.scene.background = this._buildBackdrop();
 
     this.camera = new THREE.PerspectiveCamera(
       36, window.innerWidth / window.innerHeight, 0.1, 100,
@@ -336,6 +338,33 @@ export class Philosophy {
     this._heroPlane.position.z = HERO_Z;
     this._heroPlane.renderOrder = -1;
     this.scene.add(this._heroPlane);
+  }
+
+  _buildBackdrop() {
+    const cv  = document.createElement("canvas");
+    cv.width  = 1024;
+    cv.height = 1024;
+    const ctx = cv.getContext("2d");
+
+    // Fill pure black so corners never bleed anything else
+    ctx.fillStyle = "#000000";
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    // Radial: soft dark navy fading to pure black
+    const g = ctx.createRadialGradient(512, 440, 20, 512, 512, 780);
+    g.addColorStop(0.00, "#0e1626");
+    g.addColorStop(0.35, "#06090f");
+    g.addColorStop(0.80, "#000000");
+    g.addColorStop(1.00, "#000000");
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, 1024, 1024);
+
+    const tex = new THREE.CanvasTexture(cv);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    tex.minFilter  = THREE.LinearFilter;
+    tex.magFilter  = THREE.LinearFilter;
+    this._backdropTex = tex;
+    return tex;
   }
 
   _buildProceduralEnv() {
