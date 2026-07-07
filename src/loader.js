@@ -56,20 +56,7 @@ vec3 sampleEnv(vec3 dir) {
   float fillFall = pow(max(dot(dir, fillDir), 0.0), 8.0);
   sky += vec3(0.35, 0.55, 0.85) * fillFall * 0.35;
 
-  // fine star field — glimmer that reads through the refraction
-  float sparkle = pow(max(0.0,
-      sin(dir.x * 78.0 + uTime * 1.4) *
-      sin(dir.y * 82.0 - uTime * 0.9) *
-      sin(dir.z * 74.0 + uTime * 1.1)
-  ), 20.0);
-  sky += vec3(1.0) * sparkle * 1.4;
-
   return sky;
-}
-
-// Cheap hash for per-fragment jitter → breaks aliasing on the sparkle
-float hash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453);
 }
 
 void main() {
@@ -108,10 +95,6 @@ void main() {
 
   // Body absorption tint — a whisper of blue in the "glass"
   col *= mix(vec3(0.92, 0.96, 1.02), vec3(1.0), fres);
-
-  // Per-facet micro-sparkle — high-freq flicker only where fresnel is low
-  float jitter = hash(floor(vWorldPos.xz * 8.0) + uTime * 0.15);
-  col += (1.0 - fres) * jitter * vec3(0.15, 0.18, 0.22);
 
   // Tone curve — subtle contrast boost so the fire pops on dark bg
   col = pow(col, vec3(0.92));
