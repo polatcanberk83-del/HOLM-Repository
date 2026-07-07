@@ -432,7 +432,10 @@ async function boot() {
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
   camera.lookAt(_lookNow);
 
-  // Cinematic preloader — diamond + counter, then clip-collapse, then Voronoi shatter
+  // Cinematic preloader — diamond + counter → iris reveal
+  // Camera dolly + caption fade fire at reveal-start so they play DURING
+  // the iris opening (not after), producing a continuous transition
+  // rather than "iris then jump-to-settled-scene".
   let mainTickStarted = false;
   const loader = new Loader({
     renderer,
@@ -440,6 +443,18 @@ async function boot() {
       if (mainTickStarted) return;
       mainTickStarted = true;
       requestAnimationFrame(tick);
+
+      gsap.to(camera.position, {
+        z: p0.z,
+        duration: 3.4,
+        ease: "power2.out",
+      });
+      gsap.to(captionEl, {
+        opacity: 1,
+        duration: 1.2,
+        delay: 1.8,
+        ease: "power2.out",
+      });
     },
   });
 
@@ -457,9 +472,6 @@ async function boot() {
 
   loader.markComplete();
   await loaderPromise;
-
-  gsap.to(camera.position, { z: p0.z, duration: 2.5, ease: "power2.inOut" });
-  gsap.to(captionEl, { opacity: 1, duration: 1.0, delay: 0.5, ease: "power2.out" });
 
   // CTA button magnetic hover
   const ctaBtn = document.querySelector(".proj-cta");

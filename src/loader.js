@@ -10,9 +10,9 @@ const COLLAPSE_DURATION = 0.75;
 const COLLAPSE_EASE     = "power3.inOut";
 
 // Iris reveal — a transparent circle expands from center
-const REVEAL_DURATION   = 1.5;
-const REVEAL_EASE       = "power3.inOut";
-const REVEAL_SOFT_PX    = 60;                    // edge softness of the iris
+const REVEAL_DURATION   = 2.2;                   // longer feels less abrupt
+const REVEAL_EASE       = "power2.inOut";        // softer than power3
+const REVEAL_SOFT_PX    = 180;                   // wide edge softness — no hard ring
 
 // ─── Diamond shader — refraction + dispersion + fresnel ─────────────
 const DIAMOND_VERT = /* glsl */`
@@ -307,9 +307,9 @@ export class Loader {
       // Overlay whole-opacity fade in the last portion — softens any residue
       tl.to(overlay, {
         opacity: 0,
-        duration: 0.55,
+        duration: 0.75,
         ease: "power2.out",
-      }, REVEAL_DURATION - 0.4);
+      }, REVEAL_DURATION - 0.55);
     });
   }
 
