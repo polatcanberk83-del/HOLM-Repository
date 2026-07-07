@@ -1,0 +1,129 @@
+/* ═══ HOLM Philosophy page ═══════════════════════════════════════════ */
+
+.holm-philosophy {
+  position: relative;
+  min-height: 100vh;
+  color: rgba(232, 240, 252, 0.96);
+  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
+  isolation: isolate;
+}
+
+/* ─── Fullscreen WebGL diamond ─────────────────────────────────── */
+.holm-philosophy__canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Faint darkening + vignette so type stays crisp over the gem */
+.holm-philosophy__vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(
+      ellipse at center,
+      rgba(0, 0, 0, 0.05) 0%,
+      rgba(0, 0, 0, 0.30) 55%,
+      rgba(0, 0, 0, 0.70) 100%
+    );
+}
+
+/* ─── Manifesto content — sits above the canvas ─────────────────── */
+.holm-philosophy__content {
+  position: relative;
+  z-index: 2;
+  max-width: 780px;
+  margin: 0 auto;
+  padding: 32vh 6vw 30vh;
+  pointer-events: auto;
+}
+
+.holm-philosophy__block {
+  padding: 0 1vw;
+  margin: 0 0 62vh 0;
+}
+.holm-philosophy__block:last-of-type {
+  margin-bottom: 18vh;
+}
+
+/* Each line clipped from the bottom for line-mask reveal */
+.holm-philosophy__line {
+  overflow: hidden;
+  padding: 0.06em 0;
+}
+.holm-philosophy__line-inner {
+  display: block;
+  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
+  font-weight: 300;
+  font-style: italic;
+  font-size: clamp(1.65rem, 3.4vw, 2.7rem);
+  line-height: 1.28;
+  letter-spacing: 0.004em;
+  color: rgba(238, 246, 255, 0.94);
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.55);
+  will-change: transform, opacity;
+}
+
+/* Final "This takes time." stanza gets a hair more presence */
+.holm-philosophy__block[data-final="true"] .holm-philosophy__line-inner {
+  font-size: clamp(1.8rem, 3.8vw, 3.0rem);
+}
+
+/* ─── Closing affordance ────────────────────────────────────────── */
+.holm-philosophy__end {
+  padding: 22vh 0 12vh;
+  text-align: center;
+}
+
+.holm-philosophy__contact {
+  display: inline-block;
+  font-family: 'Helvetica Neue', Arial, sans-serif;
+  font-size: 0.66rem;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+  color: rgba(210, 225, 250, 0.72);
+  text-decoration: none;
+  padding: 10px 2px;
+  border-bottom: 1px solid rgba(215, 228, 255, 0.15);
+  transition: color 0.4s ease, border-color 0.4s ease, letter-spacing 0.4s ease;
+}
+.holm-philosophy__contact:hover {
+  color: rgba(245, 250, 255, 1);
+  border-color: rgba(240, 248, 255, 0.5);
+  letter-spacing: 0.32em;
+}
+
+/* ─── Mobile ────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .holm-philosophy__content {
+    padding: 28vh 7vw 26vh;
+  }
+  .holm-philosophy__block {
+    margin-bottom: 48vh;
+  }
+  .holm-philosophy__line-inner {
+    font-size: clamp(1.35rem, 6vw, 1.9rem);
+  }
+  .holm-philosophy__block[data-final="true"] .holm-philosophy__line-inner {
+    font-size: clamp(1.55rem, 7vw, 2.2rem);
+  }
+}
+
+/* ─── Reduced motion ────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .holm-philosophy__line { overflow: visible; }
+  .holm-philosophy__line-inner {
+    opacity: 0;
+    transform: none;
+    transition: opacity 1s ease;
+  }
+  .holm-philosophy__block.is-in .holm-philosophy__line-inner {
+    opacity: 1;
+  }
+}
