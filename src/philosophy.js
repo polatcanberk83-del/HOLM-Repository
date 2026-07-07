@@ -222,6 +222,7 @@ export class Philosophy {
   }
 
   // ── Three.js ────────────────────────────────────────────────────
+  _createThree() {
     this.renderer = new THREE.WebGLRenderer({
       canvas:           this.canvas,
       antialias:        true,
