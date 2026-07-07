@@ -2,13 +2,12 @@
 
 .holm-philosophy {
   position: relative;
-  min-height: 100vh;
   color: rgba(232, 240, 252, 0.96);
   font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
   isolation: isolate;
 }
 
-/* ─── Fullscreen WebGL diamond ─────────────────────────────────── */
+/* ─── WebGL layer ────────────────────────────────────────────────── */
 .holm-philosophy__canvas {
   position: fixed;
   inset: 0;
@@ -19,65 +18,130 @@
   pointer-events: none;
 }
 
-/* Faint darkening + vignette so type stays crisp over the gem */
+/* Very light vignette — no longer needs to darken heavily for legibility */
 .holm-philosophy__vignette {
   position: fixed;
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background:
-    radial-gradient(
-      ellipse at center,
-      rgba(0, 0, 0, 0.05) 0%,
-      rgba(0, 0, 0, 0.30) 55%,
-      rgba(0, 0, 0, 0.70) 100%
-    );
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.0) 0%,
+    rgba(0, 0, 0, 0.15) 60%,
+    rgba(0, 0, 0, 0.55) 100%
+  );
 }
 
-/* ─── Manifesto content — sits above the canvas ─────────────────── */
-.holm-philosophy__content {
+/* ─── Intro (holds only the scroll cue) ─────────────────────────── */
+.holm-philosophy__intro {
   position: relative;
   z-index: 2;
-  max-width: 780px;
-  margin: 0 auto;
-  padding: 32vh 6vw 30vh;
-  pointer-events: auto;
+  height: 100vh;
+  pointer-events: none;
 }
 
-.holm-philosophy__block {
-  padding: 0 1vw;
-  margin: 0 0 62vh 0;
-}
-.holm-philosophy__block:last-of-type {
-  margin-bottom: 18vh;
+.holm-philosophy__cue {
+  position: absolute;
+  left: 50%;
+  bottom: 6vh;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  will-change: transform, opacity;
+  opacity: 0.55;
 }
 
-/* Each line clipped from the bottom for line-mask reveal */
+.holm-philosophy__cue-word {
+  font-family: var(--holm-display-font, 'Fraunces', serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(0.85rem, 1.1vw, 1.05rem);
+  letter-spacing: 0.05em;
+  color: rgba(230, 240, 255, 0.78);
+}
+
+.holm-philosophy__cue-line {
+  display: block;
+  width: 1px;
+  height: 44px;
+  background: linear-gradient(
+    to bottom,
+    rgba(230, 240, 255, 0.55) 0%,
+    rgba(230, 240, 255, 0.04) 100%
+  );
+}
+
+/* ─── Beats — each 100vh scroll section ─────────────────────────── */
+.holm-philosophy__beats {
+  position: relative;
+  z-index: 2;
+}
+
+.holm-philosophy__beat {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 0 6vw;
+}
+
+.holm-philosophy__stanza {
+  position: relative;
+  max-width: 44%;
+}
+
+/* Text SIDE variants — opposite the diamond */
+.holm-philosophy__beat[data-side="left"]  .holm-philosophy__stanza {
+  margin-right: auto;
+  text-align: left;
+}
+.holm-philosophy__beat[data-side="right"] .holm-philosophy__stanza {
+  margin-left: auto;
+  text-align: right;
+}
+.holm-philosophy__beat[data-side="below"] .holm-philosophy__stanza {
+  margin: auto auto 8vh;
+  max-width: 54%;
+  align-self: flex-end;
+  text-align: center;
+}
+.holm-philosophy__beat[data-side="center-below"] .holm-philosophy__stanza {
+  margin: auto auto 12vh;
+  max-width: 62%;
+  align-self: flex-end;
+  text-align: center;
+}
+
+/* Line reveal — clipped from bottom */
 .holm-philosophy__line {
   overflow: hidden;
-  padding: 0.06em 0;
+  padding: 0.08em 0;
 }
+
 .holm-philosophy__line-inner {
   display: block;
-  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
+  font-family: var(--holm-display-font, 'Fraunces', serif);
   font-weight: 300;
   font-style: italic;
   font-size: clamp(1.65rem, 3.4vw, 2.7rem);
   line-height: 1.28;
   letter-spacing: 0.004em;
-  color: rgba(238, 246, 255, 0.94);
-  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.55);
+  color: rgba(240, 246, 255, 0.96);
+  text-shadow: 0 1px 30px rgba(0, 0, 0, 0.5);
   will-change: transform, opacity;
 }
 
-/* Final "This takes time." stanza gets a hair more presence */
-.holm-philosophy__block[data-final="true"] .holm-philosophy__line-inner {
-  font-size: clamp(1.8rem, 3.8vw, 3.0rem);
+.holm-philosophy__beat[data-final="true"] .holm-philosophy__line-inner {
+  font-size: clamp(1.9rem, 4vw, 3.2rem);
 }
 
 /* ─── Closing affordance ────────────────────────────────────────── */
 .holm-philosophy__end {
-  padding: 22vh 0 12vh;
+  position: relative;
+  z-index: 2;
+  padding: 8vh 0 14vh;
   text-align: center;
 }
 
@@ -99,31 +163,47 @@
   letter-spacing: 0.32em;
 }
 
-/* ─── Mobile ────────────────────────────────────────────────────── */
+/* ─── Mobile / narrow: collapse side layout, stack diamond + text ── */
 @media (max-width: 767px) {
-  .holm-philosophy__content {
-    padding: 28vh 7vw 26vh;
+  .holm-philosophy__beat {
+    padding: 0 6vw;
   }
-  .holm-philosophy__block {
-    margin-bottom: 48vh;
+  .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="left"]  .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="right"] .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="below"] .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="center-below"] .holm-philosophy__stanza {
+    max-width: 88%;
+    margin: auto auto 12vh;
+    align-self: flex-end;
+    text-align: center;
   }
   .holm-philosophy__line-inner {
-    font-size: clamp(1.35rem, 6vw, 1.9rem);
+    font-size: clamp(1.3rem, 5.8vw, 1.9rem);
   }
-  .holm-philosophy__block[data-final="true"] .holm-philosophy__line-inner {
+  .holm-philosophy__beat[data-final="true"] .holm-philosophy__line-inner {
     font-size: clamp(1.55rem, 7vw, 2.2rem);
   }
 }
 
-/* ─── Reduced motion ────────────────────────────────────────────── */
+/* ─── Reduced motion — center diamond, fade blocks in ──────────── */
+.holm-philosophy.is-reduced-motion .holm-philosophy__line { overflow: visible; }
+.holm-philosophy.is-reduced-motion .holm-philosophy__line-inner {
+  opacity: 0;
+  transform: none;
+  transition: opacity 1s ease;
+}
+.holm-philosophy.is-reduced-motion .holm-philosophy__beat.is-in .holm-philosophy__line-inner {
+  opacity: 1;
+}
+.holm-philosophy.is-reduced-motion .holm-philosophy__stanza,
+.holm-philosophy.is-reduced-motion .holm-philosophy__beat[data-side] .holm-philosophy__stanza {
+  margin: auto;
+  max-width: 60%;
+  text-align: center;
+  align-self: center;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .holm-philosophy__line { overflow: visible; }
-  .holm-philosophy__line-inner {
-    opacity: 0;
-    transform: none;
-    transition: opacity 1s ease;
-  }
-  .holm-philosophy__block.is-in .holm-philosophy__line-inner {
-    opacity: 1;
-  }
+  .holm-philosophy__cue { display: none; }
 }
