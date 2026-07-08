@@ -4,14 +4,7 @@
   position: relative;
   color: rgba(232, 240, 252, 0.96);
   font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
-  /* Radial depth — a whisper of navy at center receding to full black */
-  background:
-    radial-gradient(
-      ellipse 110% 80% at 50% 42%,
-      #0d1524 0%,
-      #05080f 42%,
-      #000000 75%
-    );
+  background: #000000;
   isolation: isolate;
 }
 

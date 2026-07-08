@@ -247,7 +247,6 @@ export class Philosophy {
     this.diamond   = null;
     this.envMap    = null;
     this._lights    = [];
-    this._glow      = null;            // radial aura sprite
     this._heroPlane = null;            // philosophy watermark plane
 
     // DOM
@@ -339,16 +338,11 @@ export class Philosophy {
       this.diamond.geometry.dispose();
       this.diamond.material.dispose();
     }
-    if (this._glow) {
-      this._glow.geometry.dispose();
-      this._glow.material.dispose();
-    }
     if (this._heroPlane) {
       this._heroPlane.geometry.dispose();
       this._heroPlane.material.map?.dispose();
       this._heroPlane.material.dispose();
     }
-    if (this._backdropTex) this._backdropTex.dispose();
     if (this.envMap) this.envMap.dispose();
     for (const l of this._lights) this.scene?.remove(l);
 
@@ -361,7 +355,7 @@ export class Philosophy {
     }
 
     this.renderer = this.scene = this.camera = null;
-    this.diamond  = this.envMap = this._glow = null;
+    this.diamond  = this.envMap = null;
     this.container = this.canvas = null;
   }
 
@@ -480,9 +474,6 @@ export class Philosophy {
     this.scene.environment          = this.envMap;
     this.scene.environmentIntensity = ENVMAP_INTENSITY;
 
-    // Soft radial glow sprite that follows the gem — grounds it in space
-    this._createGlow();
-
     // Diamond
     this._createDiamond();
 
@@ -537,30 +528,8 @@ export class Philosophy {
   }
 
   _buildBackdrop() {
-    const cv  = document.createElement("canvas");
-    cv.width  = 1024;
-    cv.height = 1024;
-    const ctx = cv.getContext("2d");
-
-    // Fill pure black so corners never bleed anything else
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, 1024, 1024);
-
-    // Radial: soft dark navy fading to pure black
-    const g = ctx.createRadialGradient(512, 440, 20, 512, 512, 780);
-    g.addColorStop(0.00, "#0e1626");
-    g.addColorStop(0.35, "#06090f");
-    g.addColorStop(0.80, "#000000");
-    g.addColorStop(1.00, "#000000");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 1024, 1024);
-
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.minFilter  = THREE.LinearFilter;
-    tex.magFilter  = THREE.LinearFilter;
-    this._backdropTex = tex;
-    return tex;
+    // Flat pure-black scene background — no radial, no glow
+    return new THREE.Color(0x000000);
   }
 
   _buildProceduralEnv() {
@@ -609,33 +578,6 @@ export class Philosophy {
     tex.dispose();
     pmrem.dispose();
     return envMap;
-  }
-
-  _createGlow() {
-    // Additive-blend sprite that hovers behind the gem — soft aura
-    const cv  = document.createElement("canvas");
-    cv.width  = cv.height = 512;
-    const ctx = cv.getContext("2d");
-    const grd = ctx.createRadialGradient(256, 256, 8, 256, 256, 240);
-    grd.addColorStop(0,   "rgba(255, 240, 220, 0.55)");
-    grd.addColorStop(0.4, "rgba(140, 180, 255, 0.12)");
-    grd.addColorStop(1,   "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = grd;
-    ctx.fillRect(0, 0, 512, 512);
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    const mat = new THREE.SpriteMaterial({
-      map:         tex,
-      transparent: true,
-      blending:    THREE.AdditiveBlending,
-      depthWrite:  false,
-      depthTest:   false,
-      opacity:     0.85,
-    });
-    this._glow = new THREE.Sprite(mat);
-    this._glow.scale.set(6, 6, 1);
-    this._glow.position.z = -0.6;
-    this.scene.add(this._glow);
   }
 
   _createDiamond() {
@@ -955,15 +897,6 @@ export class Philosophy {
 
       const curS = this.diamond.scale.x + (target.scale - this.diamond.scale.x) * k;
       this.diamond.scale.setScalar(curS);
-
-      // Glow follows, slightly behind, scaled with the gem
-      if (this._glow) {
-        this._glow.position.x = this.diamond.position.x;
-        this._glow.position.y = this.diamond.position.y;
-        this._glow.position.z = -0.6;
-        const gs = curS * 4.4;
-        this._glow.scale.set(gs, gs, 1);
-      }
 
       // Hero watermark plane — visible on the intro, fades as the user
       // scrolls into the manifesto so it doesn't compete with the stanzas
