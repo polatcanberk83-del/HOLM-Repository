@@ -14,96 +14,72 @@ const REVEAL_DURATION   = 2.2;                   // longer feels less abrupt
 const REVEAL_EASE       = "power2.inOut";        // softer than power3
 const REVEAL_SOFT_PX    = 180;                   // wide edge softness — no hard ring
 
-// ─── Diamond shader — refraction + dispersion + fresnel ─────────────
-const DIAMOND_VERT = /* glsl */`
-varying vec3 vWorldPos;
-void main() {
-  vec4 wp = modelMatrix * vec4(position, 1.0);
-  vWorldPos = wp.xyz;
-  gl_Position = projectionMatrix * viewMatrix * wp;
-}
-`;
-
-const DIAMOND_FRAG = /* glsl */`
-varying vec3 vWorldPos;
+// ─── Loader dotted-diamond — high-contrast B/W stipple ─────────────
+const DOTS_VERT = /* glsl */`
+attribute float aSeed;
 uniform float uTime;
-uniform float uAlpha;
-
-// Cinematic procedural env — cool sky, warm rim, subtle stars for sparkle catch
-vec3 sampleEnv(vec3 dir) {
-  float t    = dir.y * 0.5 + 0.5;
-  vec3 lowSky  = vec3(0.015, 0.028, 0.06);
-  vec3 midSky  = vec3(0.20, 0.32, 0.55);
-  vec3 highSky = vec3(0.72, 0.85, 1.05);
-
-  vec3 sky = mix(lowSky, midSky, smoothstep(0.0, 0.55, t));
-  sky      = mix(sky,     highSky, smoothstep(0.55, 1.0, t));
-
-  // warm horizon glow — golden fringe near the equator
-  float horiz = 1.0 - abs(dir.y);
-  float warm  = pow(smoothstep(0.35, 0.95, horiz), 2.2);
-  sky += vec3(1.10, 0.50, 0.18) * warm * 0.55;
-
-  // key-light hotspot — moves slowly so facets catch it as the gem turns
-  vec3  keyDir  = normalize(vec3(sin(uTime * 0.35) * 0.7, 0.55, cos(uTime * 0.35) * 0.7));
-  float keyFall = pow(max(dot(dir, keyDir), 0.0), 24.0);
-  sky += vec3(1.4, 1.25, 1.05) * keyFall * 0.9;
-
-  // secondary cool fill from opposite side
-  vec3  fillDir  = vec3(-keyDir.x, 0.2, -keyDir.z);
-  float fillFall = pow(max(dot(dir, fillDir), 0.0), 8.0);
-  sky += vec3(0.35, 0.55, 0.85) * fillFall * 0.35;
-
-  return sky;
-}
-
+uniform float uPixel;   // devicePixelRatio for consistent size
+varying float vIntensity;
 void main() {
-  // Flat-shaded per-facet normal via screen-space derivatives
-  vec3 N = normalize(cross(dFdx(vWorldPos), dFdy(vWorldPos)));
-  vec3 V = normalize(cameraPosition - vWorldPos);
-
-  float ndotv = max(dot(N, V), 0.0);
-  float fres  = pow(1.0 - ndotv, 4.5);
-
-  // Dispersion — three IORs for R/G/B, wider spread than before
-  vec3 refrR = refract(-V, N, 1.0 / 1.395);
-  vec3 refrG = refract(-V, N, 1.0 / 1.470);
-  vec3 refrB = refract(-V, N, 1.0 / 1.560);
-
-  // Fake secondary internal bounce — reflect the refracted ray off the
-  // opposite facet and sample the env again. Cheap but gives depth.
-  vec3 innerN  = -N;
-  vec3 bounceR = reflect(refrR, innerN);
-  vec3 bounceG = reflect(refrG, innerN);
-  vec3 bounceB = reflect(refrB, innerN);
-
-  float bounceMix = 0.42;
-  vec3 refractionColor = vec3(
-    mix(sampleEnv(refrR).r, sampleEnv(bounceR).r, bounceMix),
-    mix(sampleEnv(refrG).g, sampleEnv(bounceG).g, bounceMix),
-    mix(sampleEnv(refrB).b, sampleEnv(bounceB).b, bounceMix)
-  );
-
-  vec3 reflColor = sampleEnv(reflect(-V, N));
-
-  vec3 col = mix(refractionColor, reflColor, fres);
-
-  // Bright rim — pushes the edge toward white as facets meet the camera
-  col += fres * vec3(0.98, 0.99, 1.05) * 0.85;
-
-  // Body absorption tint — a whisper of blue in the "glass"
-  col *= mix(vec3(0.92, 0.96, 1.02), vec3(1.0), fres);
-
-  // Tone curve — subtle contrast boost so the fire pops on dark bg
-  col = pow(col, vec3(0.92));
-
-  gl_FragColor = vec4(col, uAlpha);
+  vec4 mv = modelViewMatrix * vec4(position, 1.0);
+  gl_Position = projectionMatrix * mv;
+  // Perspective-scaled point size, kept small for grain
+  gl_PointSize = uPixel * (260.0 / -mv.z);
+  // Twinkle — deterministic per-seed, animated over time
+  float phase = aSeed * 47.31 + uTime * 2.3;
+  vIntensity = 0.30 + 0.70 * abs(sin(phase));
 }
 `;
 
-// ─── Brilliant-cut diamond geometry ──────────────────────────────────
-// N-sided rings stacked by height; alternating rings rotate half-facet
-// so adjacent facets zig-zag — the shape a "round brilliant" would have.
+const DOTS_FRAG = /* glsl */`
+uniform float uAlpha;
+varying float vIntensity;
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  if (d > 0.5) discard;
+  float a = (1.0 - d * 2.0) * vIntensity * uAlpha;
+  gl_FragColor = vec4(vec3(1.0), a);
+}
+`;
+
+// Brilliant-cut vertical profile — used to sample points inside the volume.
+// y positive = up. Returns the horizontal radius at height y (0 outside).
+function diamondProfileRadius(y) {
+  if (y > 0.55 || y < -1.10) return 0;
+  if (y >= 0.10) {
+    // crown: y=0.55→r=0.42, y=0.10→r=1.00
+    const t = (0.55 - y) / (0.55 - 0.10);
+    return 0.42 + (1.00 - 0.42) * t;
+  }
+  // pavilion: y=0.10→r=1.00, y=-1.10→r=0.00
+  const t = (0.10 - y) / (0.10 - (-1.10));
+  return 1.00 * (1 - t);
+}
+
+// ─── Volume sampler — dense points inside the diamond profile ──────
+function sampleDiamondVolume(count) {
+  const positions = new Float32Array(count * 3);
+  const seeds     = new Float32Array(count);
+  let i = 0;
+  const yMin = -1.10, yMax = 0.55;
+  while (i < count) {
+    const y = yMin + Math.random() * (yMax - yMin);
+    const rMax = diamondProfileRadius(y);
+    if (rMax <= 0) continue;
+    // sqrt for uniform disk density
+    const r     = Math.sqrt(Math.random()) * rMax;
+    const theta = Math.random() * Math.PI * 2;
+    positions[i * 3    ] = Math.cos(theta) * r;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = Math.sin(theta) * r;
+    seeds[i] = Math.random();
+    i++;
+  }
+  return { positions, seeds };
+}
+
+// ─── Brilliant-cut diamond geometry (kept for reference/reuse) ─────
 function createBrilliantDiamond(N = 16) {
   const positions = [];
   const indices   = [];
@@ -336,22 +312,30 @@ export class Loader {
   }
 
   _createDiamond() {
-    // Multi-ring brilliant cut — table + crown + girdle + pavilion + culet
-    const geom = createBrilliantDiamond(16);
-    geom.scale(0.82, 0.98, 0.82);
+    // Dense volume of white stipple points → high-contrast B/W diamond
+    const COUNT = 5200;
+    const { positions, seeds } = sampleDiamondVolume(COUNT);
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute("aSeed",    new THREE.Float32BufferAttribute(seeds, 1));
+    geom.scale(0.85, 0.98, 0.85);
 
     const mat = new THREE.ShaderMaterial({
-      vertexShader:   DIAMOND_VERT,
-      fragmentShader: DIAMOND_FRAG,
+      vertexShader:   DOTS_VERT,
+      fragmentShader: DOTS_FRAG,
       uniforms: {
         uTime:  { value: 0 },
         uAlpha: { value: 1 },
+        uPixel: { value: Math.min(window.devicePixelRatio || 1, 2) },
       },
       transparent: true,
+      depthWrite:  false,
+      blending:    THREE.AdditiveBlending,
     });
 
-    this.diamond = new THREE.Mesh(geom, mat);
-    // Tilt slightly toward the viewer so the crown facets catch the key light
+    this.diamond = new THREE.Points(geom, mat);
+    // Slight tilt toward viewer
     this.diamond.rotation.x = -0.28;
     this.scene.add(this.diamond);
 

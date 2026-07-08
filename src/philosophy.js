@@ -43,6 +43,120 @@ const KEY_COLOR    = 0xfff2dc;
 const FILL_COLOR   = 0x89b0e4;
 const RIM_COLOR    = 0xb8c0ee;
 
+// ─── Particle diamond — vertex + fragment shaders ────────────────────
+const PARTICLE_COUNT     = 9000;
+const PARTICLE_NOISE_AMP = 0.028;   // idle turbulence displacement
+const MOUSE_REPEL_RADIUS = 1.15;    // world-units, in local diamond space
+const MOUSE_REPEL_FORCE  = 0.55;    // max push distance
+const MOUSE_LERP         = 0.14;    // spring toward the actual cursor
+const POINT_SIZE_SCALE   = 520.0;   // gl_PointSize scalar (perspective-scaled)
+
+const PARTICLE_VERT = /* glsl */`
+attribute float aSeed;
+uniform float   uTime;
+uniform vec3    uMouseLocal;   // cursor in the diamond's local frame
+uniform float   uPixel;
+varying float   vSeed;
+varying float   vRepel;
+varying vec3    vLocal;
+
+void main() {
+  vec3 base = position;
+
+  // Idle turbulence — smooth per-axis waves keyed on seed so no two match
+  vec3 wob;
+  wob.x = sin(base.y * 3.6 + uTime * 0.62 + aSeed * 12.3) *
+          cos(base.z * 2.9 + uTime * 0.48 + aSeed *  9.7);
+  wob.y = sin(base.z * 3.1 + uTime * 0.54 + aSeed * 15.1) *
+          cos(base.x * 2.7 + uTime * 0.44 + aSeed *  7.5);
+  wob.z = sin(base.x * 3.8 + uTime * 0.68 + aSeed * 11.3) *
+          cos(base.y * 3.2 + uTime * 0.52 + aSeed * 13.9);
+  base += wob * ${PARTICLE_NOISE_AMP.toFixed(4)};
+
+  // Mouse repel — pushes particles radially away from the cursor
+  vec3  toMouse = base - uMouseLocal;
+  float d       = length(toMouse);
+  float repel   = 0.0;
+  if (d < ${MOUSE_REPEL_RADIUS.toFixed(4)}) {
+    float t = 1.0 - d / ${MOUSE_REPEL_RADIUS.toFixed(4)};
+    repel   = t * t;                         // ease-in for a rubbery falloff
+    base   += normalize(toMouse + vec3(0.0001)) * repel * ${MOUSE_REPEL_FORCE.toFixed(4)};
+  }
+
+  vec4 mv = modelViewMatrix * vec4(base, 1.0);
+  gl_Position  = projectionMatrix * mv;
+  // Repelled particles inflate slightly so the hover reads as pressure
+  gl_PointSize = uPixel * (${POINT_SIZE_SCALE.toFixed(1)} / -mv.z) * (1.0 + repel * 0.85);
+
+  vSeed  = aSeed;
+  vRepel = repel;
+  vLocal = base;
+}
+`;
+
+const PARTICLE_FRAG = /* glsl */`
+uniform float uTime;
+varying float vSeed;
+varying float vRepel;
+varying vec3  vLocal;
+
+void main() {
+  vec2 c = gl_PointCoord - 0.5;
+  float d = length(c);
+  if (d > 0.5) discard;
+
+  // Soft round sprite with a hot core
+  float core = pow(1.0 - d * 2.0, 1.9);
+
+  // Iridescent color — blue-white base, warmer at higher y, cool at low y
+  vec3 hi   = vec3(0.96, 0.98, 1.05);
+  vec3 mid  = vec3(0.60, 0.78, 1.02);
+  vec3 low  = vec3(0.40, 0.55, 0.90);
+  float t   = clamp(vLocal.y * 0.6 + 0.5, 0.0, 1.0);
+  vec3 col  = mix(low, mid, smoothstep(0.0, 0.55, t));
+  col       = mix(col, hi,  smoothstep(0.55, 1.0, t));
+
+  // Repel brightens toward warm white — hover reads as heat
+  col = mix(col, vec3(1.05, 0.95, 0.82), vRepel * 0.55);
+
+  // Slow per-particle twinkle
+  float twinkle = 0.72 + 0.28 * abs(sin(vSeed * 51.7 + uTime * 1.6));
+
+  gl_FragColor = vec4(col, core * twinkle * 0.85);
+}
+`;
+
+// Rejection-sample a dense point cloud inside the brilliant-cut profile
+function sampleDiamondCloud(count) {
+  // Same profile as loader.js — table/crown/girdle/pavilion/culet
+  const yMin = -1.10, yMax = 0.55;
+  const rAt = (y) => {
+    if (y > 0.55 || y < -1.10) return 0;
+    if (y >= 0.10) {
+      const t = (0.55 - y) / (0.55 - 0.10);
+      return 0.42 + (1.00 - 0.42) * t;
+    }
+    const t = (0.10 - y) / (0.10 - (-1.10));
+    return 1.00 * (1 - t);
+  };
+  const positions = new Float32Array(count * 3);
+  const seeds     = new Float32Array(count);
+  let i = 0;
+  while (i < count) {
+    const y = yMin + Math.random() * (yMax - yMin);
+    const rMax = rAt(y);
+    if (rMax <= 0) continue;
+    const r     = Math.sqrt(Math.random()) * rMax;
+    const theta = Math.random() * Math.PI * 2;
+    positions[i * 3    ] = Math.cos(theta) * r;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = Math.sin(theta) * r;
+    seeds[i] = Math.random();
+    i++;
+  }
+  return { positions, seeds };
+}
+
 const MANIFESTO = [
   ["Some studios tell stories.",                    "We work toward a single moment."],
   ["The moment a rough idea holds still —",         "and becomes something finished."],
@@ -103,10 +217,20 @@ export class Philosophy {
     this._targetTilt  = 0;
     this._pressure    = 0;             // 0..1 — how compressed the diamond is
 
+    // Mouse (interactive particle repel)
+    this._mouseNdc         = new THREE.Vector2(-99, -99);   // off-screen until move
+    this._mouseWorld       = new THREE.Vector3();
+    this._mouseWorldSmooth = new THREE.Vector3(999, 999, 999);
+    this._invMat           = new THREE.Matrix4();
+
+    // Elapsed time driven off dt so we're timeline-consistent
+    this._elapsed = 0;
+
     // Handlers
     this._onResize       = this._onResize.bind(this);
     this._onLenisScroll  = this._onLenisScroll.bind(this);
     this._onNativeScroll = this._onNativeScroll.bind(this);
+    this._onPointerMove  = this._onPointerMove.bind(this);
     this._observer       = null;
   }
 
@@ -116,16 +240,28 @@ export class Philosophy {
     this._createThree();
     this._bindScroll();
     this._bindResize();
+    this._bindPointer();
     this._observeBlocks();
     this._bindCtaMagnetic();
     this._startCue();
     this._startLoop();
   }
 
+  _bindPointer() {
+    window.addEventListener("pointermove", this._onPointerMove, { passive: true });
+  }
+  _onPointerMove(e) {
+    this._mouseNdc.set(
+      (e.clientX / window.innerWidth) * 2 - 1,
+      -((e.clientY / window.innerHeight) * 2 - 1),
+    );
+  }
+
   destroy() {
     this._active = false;
     if (this._rafId) cancelAnimationFrame(this._rafId);
     window.removeEventListener("resize", this._onResize);
+    window.removeEventListener("pointermove", this._onPointerMove);
     if (this.lenis && this._lenisScrollBound) {
       this.lenis.off("scroll", this._onLenisScroll);
     } else {
@@ -441,31 +577,31 @@ export class Philosophy {
   }
 
   _createDiamond() {
-    const geom = this._createBrilliantGeometry(28);
+    // Particle-based diamond — dense point cloud sampled inside the profile,
+    // driven by an interactive vertex shader (idle turbulence + mouse repel).
+    const count = this._isMobile ? Math.floor(PARTICLE_COUNT * 0.55) : PARTICLE_COUNT;
+    const { positions, seeds } = sampleDiamondCloud(count);
+
+    const geom = new THREE.BufferGeometry();
+    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    geom.setAttribute("aSeed",    new THREE.Float32BufferAttribute(seeds, 1));
+    // Fill the viewport dominantly — same silhouette scale as before
     geom.scale(1.25, 1.4, 1.25);
-    geom.computeVertexNormals();
 
-    const mat = new THREE.MeshPhysicalMaterial({
-      color:                     0xffffff,
-      metalness:                 0,
-      roughness:                 0.02,
-      transmission:              1.0,
-      thickness:                 this._isMobile ? THICKNESS_MOBILE : THICKNESS_DESKTOP,
-      ior:                       2.4,
-      attenuationDistance:       4.0,
-      attenuationColor:          new THREE.Color(0xe8f0ff),
-      envMapIntensity:           ENVMAP_INTENSITY,
-      iridescence:               IRIDESCENCE,
-      iridescenceIOR:            2.15,
-      iridescenceThicknessRange: IRID_THICKNESS,
-      clearcoat:                 0.9,
-      clearcoatRoughness:        0.03,
-      transparent:               true,
-      side:                      THREE.DoubleSide,
+    const mat = new THREE.ShaderMaterial({
+      vertexShader:   PARTICLE_VERT,
+      fragmentShader: PARTICLE_FRAG,
+      uniforms: {
+        uTime:       { value: 0 },
+        uMouseLocal: { value: new THREE.Vector3(999, 999, 999) },  // out-of-range on load
+        uPixel:      { value: Math.min(window.devicePixelRatio || 1, 2) },
+      },
+      transparent: true,
+      depthWrite:  false,
+      blending:    THREE.AdditiveBlending,
     });
-    if ("dispersion" in mat) mat.dispersion = DISPERSION_BASE;
 
-    this.diamond = new THREE.Mesh(geom, mat);
+    this.diamond = new THREE.Points(geom, mat);
     this.diamond.rotation.x = -0.18;
     this.scene.add(this.diamond);
   }
@@ -794,13 +930,27 @@ export class Philosophy {
       this.diamond.rotation.y = this._idleSpin;
       this.diamond.rotation.x = tilt;
 
-      // Pressure beat — dispersion bumps as the gem compresses
-      if ("dispersion" in this.diamond.material) {
-        const pressure = Math.max(0, 1 - curS / 1.0);        // 0 at scale≥1, →1 as it shrinks
-        this._pressure += (pressure - this._pressure) * k;
-        this.diamond.material.dispersion = DISPERSION_BASE +
-          this._pressure * DISPERSION_PRESSURE;
-      }
+      // Mouse tracking → shader uniforms for the particle repel.
+      // Unproject NDC to world at the diamond's z-plane, spring-lerp,
+      // then convert to local space so it survives the diamond's rotation.
+      const dMouseW = this.diamond.position.z - this.camera.position.z;
+      const halfHm  = Math.tan(halfFov) * Math.abs(dMouseW);
+      const halfWm  = halfHm * this.camera.aspect;
+      this._mouseWorld.set(
+        this._mouseNdc.x * halfWm + this.diamond.position.x,
+        this._mouseNdc.y * halfHm + this.diamond.position.y,
+        this.diamond.position.z,
+      );
+      this._mouseWorldSmooth.lerp(this._mouseWorld, MOUSE_LERP);
+
+      this.diamond.updateMatrixWorld();
+      const uMouseLocal = this.diamond.material.uniforms.uMouseLocal.value;
+      uMouseLocal.copy(this._mouseWorldSmooth);
+      this.diamond.worldToLocal(uMouseLocal);
+
+      // Advance the shader clock
+      this._elapsed += dt;
+      this.diamond.material.uniforms.uTime.value = this._elapsed;
 
       this.renderer.render(this.scene, this.camera);
       this._rafId = requestAnimationFrame(tick);
