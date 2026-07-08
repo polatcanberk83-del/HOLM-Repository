@@ -1,5 +1,10 @@
 import * as THREE from "three";
 import gsap from "gsap";
+import { RoomEnvironment }  from "three/examples/jsm/environments/RoomEnvironment.js";
+import { EffectComposer }   from "three/examples/jsm/postprocessing/EffectComposer.js";
+import { RenderPass }       from "three/examples/jsm/postprocessing/RenderPass.js";
+import { UnrealBloomPass }  from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
+import { OutputPass }       from "three/examples/jsm/postprocessing/OutputPass.js";
 import "./philosophy.css";
 
 // ─── Tunables ────────────────────────────────────────────────────────
@@ -437,13 +442,10 @@ export class Philosophy {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.5 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.15;
+    this.renderer.toneMappingExposure = 1.05;
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    // Radial depth backdrop — a whisper of navy at center receding to black.
-    // Set as a CanvasTexture on scene.background so the gem's transmission
-    // still has something to refract against (a plain null bg gives it nothing).
     this.scene.background = this._buildBackdrop();
 
     this.camera = new THREE.PerspectiveCamera(
@@ -452,10 +454,31 @@ export class Philosophy {
     this.camera.position.set(0, 0, CAM_Z_BASE);
     this.camera.lookAt(0, 0, 0);
 
-    // Env
-    this.envMap = this._buildProceduralEnv();
+    // Photorealistic env — RoomEnvironment baked through PMREM.
+    // This is what Three.js's official glass demos use; it delivers the
+    // studio-showcase reflections and refractions that a procedural
+    // gradient cannot.
+    const pmrem   = new THREE.PMREMGenerator(this.renderer);
+    const roomEnv = new RoomEnvironment();
+    this.envMap   = pmrem.fromScene(roomEnv, 0.04).texture;
+    pmrem.dispose();
     this.scene.environment          = this.envMap;
     this.scene.environmentIntensity = ENVMAP_INTENSITY;
+
+    // Composer with UnrealBloomPass — makes the sparkle catches read
+    // as actual light, not just bright pixels
+    this._composer = new EffectComposer(this.renderer);
+    this._composer.setPixelRatio(this.renderer.getPixelRatio());
+    this._composer.setSize(window.innerWidth, window.innerHeight);
+    this._composer.addPass(new RenderPass(this.scene, this.camera));
+    this._bloom = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.85,   // strength
+      0.55,   // radius
+      0.82,   // threshold — only the brightest highlights bloom
+    );
+    this._composer.addPass(this._bloom);
+    this._composer.addPass(new OutputPass());
 
     // Diamond
     this._createDiamond();
@@ -517,81 +540,34 @@ export class Philosophy {
     return new THREE.Color(0x000000);
   }
 
-  _buildProceduralEnv() {
-    const cv  = document.createElement("canvas");
-    cv.width  = 1024;
-    cv.height = 512;
-    const ctx = cv.getContext("2d");
-
-    const g = ctx.createLinearGradient(0, 0, 0, 512);
-    g.addColorStop(0.00, "#faf5e8");
-    g.addColorStop(0.20, "#a4bcdc");
-    g.addColorStop(0.45, "#3f5074");
-    g.addColorStop(0.55, "#1c2340");
-    g.addColorStop(0.80, "#0b1220");
-    g.addColorStop(1.00, "#000000");
-    ctx.fillStyle = g;
-    ctx.fillRect(0, 0, 1024, 512);
-
-    const horiz = ctx.createLinearGradient(0, 200, 0, 320);
-    horiz.addColorStop(0,   "rgba(0,0,0,0)");
-    horiz.addColorStop(0.5, "rgba(255, 178, 96, 0.34)");
-    horiz.addColorStop(1,   "rgba(0,0,0,0)");
-    ctx.fillStyle = horiz;
-    ctx.fillRect(0, 200, 1024, 120);
-
-    const hi = ctx.createRadialGradient(300, 130, 8, 300, 130, 150);
-    hi.addColorStop(0,   "rgba(255, 250, 232, 1.0)");
-    hi.addColorStop(0.35, "rgba(255, 235, 200, 0.55)");
-    hi.addColorStop(1,   "rgba(255, 235, 200, 0)");
-    ctx.fillStyle = hi;
-    ctx.fillRect(0, 0, 1024, 512);
-
-    const back = ctx.createRadialGradient(760, 170, 6, 760, 170, 130);
-    back.addColorStop(0, "rgba(190, 220, 255, 0.85)");
-    back.addColorStop(1, "rgba(190, 220, 255, 0)");
-    ctx.fillStyle = back;
-    ctx.fillRect(0, 0, 1024, 512);
-
-    const tex = new THREE.CanvasTexture(cv);
-    tex.mapping    = THREE.EquirectangularReflectionMapping;
-    tex.colorSpace = THREE.SRGBColorSpace;
-
-    const pmrem = new THREE.PMREMGenerator(this.renderer);
-    pmrem.compileEquirectangularShader();
-    const envMap = pmrem.fromEquirectangular(tex).texture;
-    tex.dispose();
-    pmrem.dispose();
-    return envMap;
-  }
-
   _createDiamond() {
-    // Real transparent glass — brilliant-cut mesh + MeshPhysicalMaterial with
-    // transmission. envMap (procedural) drives reflection AND refraction so
-    // the facets catch light against the flat black backdrop.
-    const geom = this._createBrilliantGeometry(32);
+    // Brilliant-cut mesh, higher tessellation for cleaner facets
+    const geom = this._createBrilliantGeometry(48);
     geom.scale(1.25, 1.4, 1.25);
     geom.computeVertexNormals();
 
+    // MeshPhysicalMaterial tuned for the RoomEnvironment PMREM.
+    // Every param picked to give a physically-plausible diamond that reads
+    // as glass with fire, not as a smoked lump.
     const mat = new THREE.MeshPhysicalMaterial({
       color:                     0xffffff,
       metalness:                 0.0,
-      roughness:                 0.08,              // slight micro-frost — reads as facet texture
+      roughness:                 0.0,               // mirror facets
       transmission:              1.0,
-      thickness:                 this._isMobile ? 1.6 : 2.4,   // thicker → deeper refraction
-      ior:                       2.4,
-      attenuationDistance:       3.6,
-      attenuationColor:          new THREE.Color(0xd8e4ff),
-      envMapIntensity:           1.8,
-      iridescence:               0.75,              // rainbow rim, prominent
-      iridescenceIOR:            2.15,
-      iridescenceThicknessRange: [220, 780],
+      thickness:                 this._isMobile ? 1.2 : 1.8,
+      ior:                       2.417,             // real diamond
+      attenuationDistance:       6.0,
+      attenuationColor:          new THREE.Color(0xffffff),
+      envMapIntensity:           2.2,
+      iridescence:               0.35,              // subtle rainbow at grazing angles
+      iridescenceIOR:            1.55,
+      iridescenceThicknessRange: [400, 900],
       clearcoat:                 1.0,
-      clearcoatRoughness:        0.02,
+      clearcoatRoughness:        0.0,
       transparent:               true,
       side:                      THREE.DoubleSide,
     });
-    if ("dispersion" in mat) mat.dispersion = 5.5;  // heavy chromatic split — the "fire"
+    if ("dispersion" in mat) mat.dispersion = 3.2;  // fire without the rainbow blur
 
     this.diamond = new THREE.Mesh(geom, mat);
     this.diamond.rotation.x = -0.18;
@@ -698,7 +674,9 @@ export class Philosophy {
       this.camera.aspect = w / h;
       this.camera.updateProjectionMatrix();
     }
-    if (this.renderer) this.renderer.setSize(w, h);
+    if (this.renderer)  this.renderer.setSize(w, h);
+    if (this._composer) this._composer.setSize(w, h);
+    if (this._bloom)    this._bloom.setSize(w, h);
     this._isMobile = w < 768 || "ontouchstart" in window;
   }
 
@@ -887,7 +865,7 @@ export class Philosophy {
 
       this._elapsed += dt;
 
-      this.renderer.render(this.scene, this.camera);
+      this._composer.render();
       this._rafId = requestAnimationFrame(tick);
     };
     this._rafId = requestAnimationFrame(tick);
