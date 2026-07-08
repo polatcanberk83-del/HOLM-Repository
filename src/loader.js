@@ -223,8 +223,8 @@ export class Loader {
         ease: COLLAPSE_EASE,
       }, 0);
 
-      tl.to(this.diamond.material.uniforms.uAlpha, {
-        value: 0,
+      tl.to(this.diamond.material, {
+        opacity: 0,
         duration: COLLAPSE_DURATION * 0.85,
         ease: "power2.in",
       }, COLLAPSE_DURATION * 0.15);
