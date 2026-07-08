@@ -20,10 +20,6 @@ const IRID_THICKNESS     = [220, 780];
 const THICKNESS_DESKTOP  = 1.7;
 const THICKNESS_MOBILE   = 1.0;
 
-// Cue
-const CUE_BOB            = 9;          // px yoyo travel
-const CUE_BOB_DUR        = 1.25;       // s
-
 // Beats — each has a diamond target (screen-space nx/ny/scale) and a text side.
 // y positive = up, x positive = right, in normalized screen units.
 // Anchored to DOM sections; a weighted blend of each section's viewport-center
@@ -253,7 +249,6 @@ export class Philosophy {
     this.container = null;
     this.canvas    = null;
     this.blocks    = [];               // beat sections carrying stanzas
-    this.scrollCue = null;
 
     // Anim state
     this._rafId       = null;
@@ -261,9 +256,6 @@ export class Philosophy {
     this._prevTime    = 0;
     this._scrollT     = 0;
     this._idleSpin    = 0;
-    this._cueFaded    = false;
-    this._cueTween    = null;
-
     // CTA magnetic
     this._ctaEl          = null;
     this._ctaMove        = null;
@@ -305,7 +297,6 @@ export class Philosophy {
     this._bindPointer();
     this._observeBlocks();
     this._bindCtaMagnetic();
-    this._startCue();
     this._startLoop();
   }
 
@@ -330,7 +321,6 @@ export class Philosophy {
       window.removeEventListener("scroll", this._onNativeScroll);
     }
     if (this._observer)  this._observer.disconnect();
-    if (this._cueTween)  this._cueTween.kill();
     if (this._ctaMove)  window.removeEventListener("mousemove", this._ctaMove);
     if (this._ctaLeave) window.removeEventListener("mouseleave", this._ctaLeave);
 
@@ -409,12 +399,7 @@ export class Philosophy {
     container.innerHTML = `
       <canvas class="holm-philosophy__canvas" aria-hidden="true"></canvas>
 
-      <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true">
-        <div class="holm-philosophy__cue">
-          <span class="holm-philosophy__cue-word">scroll to discover</span>
-          <span class="holm-philosophy__cue-line"></span>
-        </div>
-      </section>
+      <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true"></section>
 
       <main class="holm-philosophy__beats">
         ${beatsHtml}
@@ -425,8 +410,6 @@ export class Philosophy {
     this.container = container;
     this.canvas    = container.querySelector(".holm-philosophy__canvas");
     this.blocks    = [...container.querySelectorAll(".holm-philosophy__beat")];
-    this.scrollCue = container.querySelector(".holm-philosophy__cue");
-
     // Beat DOM anchors — one element per BEATS entry (intro + each text beat).
     // Weighted-blend uses each element's viewport-center distance.
     this._beatEls = [];
@@ -697,12 +680,10 @@ export class Philosophy {
   }
   _onLenisScroll({ scroll, limit }) {
     this._scrollT = limit > 0 ? Math.min(scroll / limit, 1) : 0;
-    this._maybeFadeCue();
   }
   _onNativeScroll() {
     const max = document.documentElement.scrollHeight - window.innerHeight;
     this._scrollT = max > 0 ? Math.min(window.scrollY / max, 1) : 0;
-    this._maybeFadeCue();
   }
 
   // ── Resize ──────────────────────────────────────────────────────
@@ -717,32 +698,6 @@ export class Philosophy {
     }
     if (this.renderer) this.renderer.setSize(w, h);
     this._isMobile = w < 768 || "ontouchstart" in window;
-  }
-
-  // ── Cue ─────────────────────────────────────────────────────────
-  _startCue() {
-    if (this._reducedMotion || !this.scrollCue) return;
-    this._cueTween = gsap.to(this.scrollCue, {
-      y:        CUE_BOB,
-      duration: CUE_BOB_DUR,
-      ease:     "sine.inOut",
-      yoyo:     true,
-      repeat:   -1,
-    });
-  }
-  _maybeFadeCue() {
-    if (this._cueFaded || !this.scrollCue) return;
-    if (this._scrollT > 0.004) {
-      this._cueFaded = true;
-      this._cueTween?.kill();
-      gsap.to(this.scrollCue, {
-        opacity:  0,
-        y:        -6,
-        duration: 0.6,
-        ease:     "power2.out",
-        onComplete: () => this.scrollCue.style.pointerEvents = "none",
-      });
-    }
   }
 
   // ── Beat reveal ─────────────────────────────────────────────────

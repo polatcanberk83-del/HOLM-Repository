@@ -128,7 +128,7 @@
 .holm-menu__name {
   font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
   font-weight: 300;
-  font-style: italic;
+  font-style: normal;
   font-size: 1.55rem;
   letter-spacing: 0.005em;
   line-height: 1;
