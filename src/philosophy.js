@@ -414,7 +414,6 @@ export class Philosophy {
 
     container.innerHTML = `
       <canvas class="holm-philosophy__canvas" aria-hidden="true"></canvas>
-      <div class="holm-philosophy__vignette" aria-hidden="true"></div>
 
       <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true">
         <div class="holm-philosophy__cue">

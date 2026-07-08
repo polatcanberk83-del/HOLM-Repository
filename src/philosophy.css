@@ -26,20 +26,6 @@
   pointer-events: none;
 }
 
-/* Very light vignette — no longer needs to darken heavily for legibility */
-.holm-philosophy__vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0.0) 0%,
-    rgba(0, 0, 0, 0.15) 60%,
-    rgba(0, 0, 0, 0.55) 100%
-  );
-}
-
 /* ─── Intro (holds only the scroll cue) ─────────────────────────── */
 .holm-philosophy__intro {
   position: relative;
