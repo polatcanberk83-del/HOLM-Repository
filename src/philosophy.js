@@ -581,23 +581,36 @@ export class Philosophy {
   }
 
   _createDiamond() {
-    // Hollow line-art diamond — same treatment as the loader: EdgesGeometry
-    // pulls every facet boundary of the brilliant cut and we render it as
-    // pure white LineSegments. No transmission, no particles.
-    const solid = this._createBrilliantGeometry(28);
-    solid.scale(1.25, 1.4, 1.25);
+    // Real transparent glass — brilliant-cut mesh + MeshPhysicalMaterial with
+    // transmission. envMap (procedural) drives reflection AND refraction so
+    // the facets catch light against the flat black backdrop.
+    const geom = this._createBrilliantGeometry(32);
+    geom.scale(1.25, 1.4, 1.25);
+    geom.computeVertexNormals();
 
-    const edges = new THREE.EdgesGeometry(solid, 1);   // 1° threshold — every facet
-    const mat = new THREE.LineBasicMaterial({
-      color:       0xffffff,
-      transparent: true,
-      opacity:     0.92,
+    const mat = new THREE.MeshPhysicalMaterial({
+      color:                     0xffffff,
+      metalness:                 0.0,
+      roughness:                 0.02,
+      transmission:              1.0,
+      thickness:                 this._isMobile ? 0.9 : 1.4,
+      ior:                       2.4,               // diamond
+      attenuationDistance:       5.5,
+      attenuationColor:          new THREE.Color(0xf0f4ff),
+      envMapIntensity:           1.15,
+      iridescence:               0.25,              // subtle rainbow catch, not a blob
+      iridescenceIOR:            2.05,
+      iridescenceThicknessRange: [220, 700],
+      clearcoat:                 0.6,
+      clearcoatRoughness:        0.05,
+      transparent:               true,
+      side:                      THREE.DoubleSide,
     });
+    if ("dispersion" in mat) mat.dispersion = 1.8;  // mild fire, no color noise
 
-    this.diamond = new THREE.LineSegments(edges, mat);
+    this.diamond = new THREE.Mesh(geom, mat);
     this.diamond.rotation.x = -0.18;
     this.scene.add(this.diamond);
-    solid.dispose();
   }
 
   _createBrilliantGeometry(N = 24) {
