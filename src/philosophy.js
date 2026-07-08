@@ -640,41 +640,22 @@ export class Philosophy {
   }
 
   _createDiamond() {
-    // Build the brilliant-cut mesh first, then sample its SURFACE (not the
-    // interior) so particles trace facets. Each point carries its face normal
-    // so the vertex shader can compute grayscale depth (rim bright, back dark).
+    // Hollow line-art diamond — same treatment as the loader: EdgesGeometry
+    // pulls every facet boundary of the brilliant cut and we render it as
+    // pure white LineSegments. No transmission, no particles.
     const solid = this._createBrilliantGeometry(28);
     solid.scale(1.25, 1.4, 1.25);
-    const solidMesh = new THREE.Mesh(solid);   // wrapper only — never added to scene
 
-    const surface = this._isMobile ? Math.floor(PARTICLE_COUNT * 0.55) : PARTICLE_COUNT;
-    const edge    = Math.floor(surface * EDGE_PARTICLE_MULT);
-    const { positions, normals, seeds, edgeMark } = sampleDiamondSurface(solidMesh, surface, edge);
-
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geom.setAttribute("aNormal",  new THREE.Float32BufferAttribute(normals,   3));
-    geom.setAttribute("aSeed",    new THREE.Float32BufferAttribute(seeds,     1));
-    geom.setAttribute("aEdge",    new THREE.Float32BufferAttribute(edgeMark,  1));
-
-    const mat = new THREE.ShaderMaterial({
-      vertexShader:   PARTICLE_VERT,
-      fragmentShader: PARTICLE_FRAG,
-      uniforms: {
-        uTime:       { value: 0 },
-        uMouseLocal: { value: new THREE.Vector3(999, 999, 999) },
-        uPixel:      { value: Math.min(window.devicePixelRatio || 1, 2) },
-      },
+    const edges = new THREE.EdgesGeometry(solid, 1);   // 1° threshold — every facet
+    const mat = new THREE.LineBasicMaterial({
+      color:       0xffffff,
       transparent: true,
-      depthWrite:  false,
-      blending:    THREE.NormalBlending,   // don't clip to white — respect grayscale
+      opacity:     0.92,
     });
 
-    this.diamond = new THREE.Points(geom, mat);
+    this.diamond = new THREE.LineSegments(edges, mat);
     this.diamond.rotation.x = -0.18;
     this.scene.add(this.diamond);
-
-    // Dispose the wrapper mesh's geometry — attributes are copied into the point cloud
     solid.dispose();
   }
 
@@ -1002,27 +983,7 @@ export class Philosophy {
       this.diamond.rotation.y = this._idleSpin;
       this.diamond.rotation.x = tilt;
 
-      // Mouse tracking → shader uniforms for the particle repel.
-      // Unproject NDC to world at the diamond's z-plane, spring-lerp,
-      // then convert to local space so it survives the diamond's rotation.
-      const dMouseW = this.diamond.position.z - this.camera.position.z;
-      const halfHm  = Math.tan(halfFov) * Math.abs(dMouseW);
-      const halfWm  = halfHm * this.camera.aspect;
-      this._mouseWorld.set(
-        this._mouseNdc.x * halfWm + this.diamond.position.x,
-        this._mouseNdc.y * halfHm + this.diamond.position.y,
-        this.diamond.position.z,
-      );
-      this._mouseWorldSmooth.lerp(this._mouseWorld, MOUSE_LERP);
-
-      this.diamond.updateMatrixWorld();
-      const uMouseLocal = this.diamond.material.uniforms.uMouseLocal.value;
-      uMouseLocal.copy(this._mouseWorldSmooth);
-      this.diamond.worldToLocal(uMouseLocal);
-
-      // Advance the shader clock
       this._elapsed += dt;
-      this.diamond.material.uniforms.uTime.value = this._elapsed;
 
       this.renderer.render(this.scene, this.camera);
       this._rafId = requestAnimationFrame(tick);
