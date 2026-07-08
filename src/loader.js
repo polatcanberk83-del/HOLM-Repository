@@ -312,32 +312,23 @@ export class Loader {
   }
 
   _createDiamond() {
-    // Dense volume of white stipple points → high-contrast B/W diamond
-    const COUNT = 5200;
-    const { positions, seeds } = sampleDiamondVolume(COUNT);
+    // Hollow line-art diamond — white edge strokes on black, rotating 360°.
+    // EdgesGeometry extracts every facet boundary from the brilliant-cut mesh
+    // so we get the classic "wireframe SVG" look.
+    const solid = createBrilliantDiamond(16);
+    solid.scale(0.85, 0.98, 0.85);
 
-    const geom = new THREE.BufferGeometry();
-    geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geom.setAttribute("aSeed",    new THREE.Float32BufferAttribute(seeds, 1));
-    geom.scale(0.85, 0.98, 0.85);
-
-    const mat = new THREE.ShaderMaterial({
-      vertexShader:   DOTS_VERT,
-      fragmentShader: DOTS_FRAG,
-      uniforms: {
-        uTime:  { value: 0 },
-        uAlpha: { value: 1 },
-        uPixel: { value: Math.min(window.devicePixelRatio || 1, 2) },
-      },
+    const edges = new THREE.EdgesGeometry(solid, 1);  // 1° so every facet shows
+    const mat = new THREE.LineBasicMaterial({
+      color:       0xffffff,
       transparent: true,
-      depthWrite:  false,
-      blending:    THREE.AdditiveBlending,
+      opacity:     0.94,
     });
 
-    this.diamond = new THREE.Points(geom, mat);
-    // Slight tilt toward viewer
+    this.diamond = new THREE.LineSegments(edges, mat);
     this.diamond.rotation.x = -0.28;
     this.scene.add(this.diamond);
+    solid.dispose();
 
     this._resize = () => {
       const w = window.innerWidth, h = window.innerHeight;
@@ -387,10 +378,9 @@ export class Loader {
       if (this.counterEl) this.counterEl.textContent = String(pct);
 
       // Diamond animation — slow gleaming spin, subtle wobble
-      this.diamond.rotation.y += dt * 0.32;
-      this.diamond.rotation.x  = -0.28 + Math.sin(elapsed * 0.45) * 0.08;
-      this.diamond.rotation.z  = Math.sin(elapsed * 0.30) * 0.05;
-      this.diamond.material.uniforms.uTime.value = elapsed;
+      // Continuous 360° spin — line-art wireframe rotates on Y only for clarity
+      this.diamond.rotation.y += dt * 0.52;
+      this.diamond.rotation.x  = -0.28 + Math.sin(elapsed * 0.35) * 0.05;
 
       this.renderer.autoClear = true;
       this.renderer.setClearColor(OVERLAY_BG, 1);

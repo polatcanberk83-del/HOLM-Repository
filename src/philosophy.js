@@ -43,118 +43,181 @@ const KEY_COLOR    = 0xfff2dc;
 const FILL_COLOR   = 0x89b0e4;
 const RIM_COLOR    = 0xb8c0ee;
 
-// ─── Particle diamond — vertex + fragment shaders ────────────────────
-const PARTICLE_COUNT     = 9000;
-const PARTICLE_NOISE_AMP = 0.028;   // idle turbulence displacement
-const MOUSE_REPEL_RADIUS = 1.15;    // world-units, in local diamond space
-const MOUSE_REPEL_FORCE  = 0.55;    // max push distance
-const MOUSE_LERP         = 0.14;    // spring toward the actual cursor
-const POINT_SIZE_SCALE   = 520.0;   // gl_PointSize scalar (perspective-scaled)
+// ─── Particle diamond — surface sample + facet-normal B/W shader ────
+const PARTICLE_COUNT     = 6500;    // surface samples — no interior blob
+const EDGE_PARTICLE_MULT = 0.55;    // extra points snapped to edges
+const PARTICLE_NOISE_AMP = 0.012;   // small — just breath, not blur
+const MOUSE_REPEL_RADIUS = 1.05;
+const MOUSE_REPEL_FORCE  = 0.35;
+const MOUSE_LERP         = 0.16;
+const POINT_SIZE_SCALE   = 320.0;
 
 const PARTICLE_VERT = /* glsl */`
+attribute vec3  aNormal;
 attribute float aSeed;
-uniform float   uTime;
-uniform vec3    uMouseLocal;   // cursor in the diamond's local frame
-uniform float   uPixel;
-varying float   vSeed;
-varying float   vRepel;
-varying vec3    vLocal;
+attribute float aEdge;              // 1.0 for edge-snapped points, 0.0 for surface
+uniform   float uTime;
+uniform   vec3  uMouseLocal;
+uniform   float uPixel;
+varying   float vShade;
+varying   float vRepel;
+varying   float vEdge;
+varying   float vSeed;
 
 void main() {
   vec3 base = position;
 
-  // Idle turbulence — smooth per-axis waves keyed on seed so no two match
-  vec3 wob;
-  wob.x = sin(base.y * 3.6 + uTime * 0.62 + aSeed * 12.3) *
-          cos(base.z * 2.9 + uTime * 0.48 + aSeed *  9.7);
-  wob.y = sin(base.z * 3.1 + uTime * 0.54 + aSeed * 15.1) *
-          cos(base.x * 2.7 + uTime * 0.44 + aSeed *  7.5);
-  wob.z = sin(base.x * 3.8 + uTime * 0.68 + aSeed * 11.3) *
-          cos(base.y * 3.2 + uTime * 0.52 + aSeed * 13.9);
-  base += wob * ${PARTICLE_NOISE_AMP.toFixed(4)};
+  // Tiny idle wobble along the local normal so the surface breathes
+  float breathe = sin(uTime * 0.6 + aSeed * 9.3) * ${PARTICLE_NOISE_AMP.toFixed(4)};
+  base += aNormal * breathe;
 
-  // Mouse repel — pushes particles radially away from the cursor
+  // Mouse repel — along the local normal for a "poke" feel
   vec3  toMouse = base - uMouseLocal;
   float d       = length(toMouse);
   float repel   = 0.0;
   if (d < ${MOUSE_REPEL_RADIUS.toFixed(4)}) {
     float t = 1.0 - d / ${MOUSE_REPEL_RADIUS.toFixed(4)};
-    repel   = t * t;                         // ease-in for a rubbery falloff
+    repel   = t * t;
     base   += normalize(toMouse + vec3(0.0001)) * repel * ${MOUSE_REPEL_FORCE.toFixed(4)};
   }
 
   vec4 mv = modelViewMatrix * vec4(base, 1.0);
-  gl_Position  = projectionMatrix * mv;
-  // Repelled particles inflate slightly so the hover reads as pressure
-  gl_PointSize = uPixel * (${POINT_SIZE_SCALE.toFixed(1)} / -mv.z) * (1.0 + repel * 0.85);
+  gl_Position = projectionMatrix * mv;
+  gl_PointSize = uPixel * (${POINT_SIZE_SCALE.toFixed(1)} / -mv.z)
+                 * (1.0 + repel * 0.9)
+                 * (1.0 + aEdge * 0.6);
 
-  vSeed  = aSeed;
+  // Facet shading — normal in view space vs view direction
+  vec3 nView = normalize(mat3(normalMatrix) * aNormal);
+  vec3 vDir  = normalize(-mv.xyz);
+  float ndotv = clamp(dot(nView, vDir), 0.0, 1.0);
+  float fres  = pow(1.0 - ndotv, 2.6);           // rim highlight
+
+  // B/W grayscale ramp: dark interior → mid facet → bright at rim/edge
+  vShade = 0.06 + ndotv * 0.42 + fres * 0.72;
+  vShade = clamp(vShade, 0.0, 1.0);
   vRepel = repel;
-  vLocal = base;
+  vEdge  = aEdge;
+  vSeed  = aSeed;
 }
 `;
 
 const PARTICLE_FRAG = /* glsl */`
 uniform float uTime;
-varying float vSeed;
+varying float vShade;
 varying float vRepel;
-varying vec3  vLocal;
+varying float vEdge;
+varying float vSeed;
 
 void main() {
-  vec2 c = gl_PointCoord - 0.5;
+  vec2  c = gl_PointCoord - 0.5;
   float d = length(c);
   if (d > 0.5) discard;
 
-  // Soft round sprite with a hot core
-  float core = pow(1.0 - d * 2.0, 1.9);
+  // Soft sprite with a hot core
+  float core  = pow(1.0 - d * 2.0, 1.7);
+  float alpha = core * vShade;
 
-  // Iridescent color — blue-white base, warmer at higher y, cool at low y
-  vec3 hi   = vec3(0.96, 0.98, 1.05);
-  vec3 mid  = vec3(0.60, 0.78, 1.02);
-  vec3 low  = vec3(0.40, 0.55, 0.90);
-  float t   = clamp(vLocal.y * 0.6 + 0.5, 0.0, 1.0);
-  vec3 col  = mix(low, mid, smoothstep(0.0, 0.55, t));
-  col       = mix(col, hi,  smoothstep(0.55, 1.0, t));
+  // Edge-snapped points punch harder so facet borders read clearly
+  alpha *= (1.0 + vEdge * 0.9);
 
-  // Repel brightens toward warm white — hover reads as heat
-  col = mix(col, vec3(1.05, 0.95, 0.82), vRepel * 0.55);
+  // Tiny per-particle twinkle — keeps the surface alive without glitter
+  float twinkle = 0.85 + 0.15 * sin(vSeed * 43.1 + uTime * 1.4);
+  alpha *= twinkle;
 
-  // Slow per-particle twinkle
-  float twinkle = 0.72 + 0.28 * abs(sin(vSeed * 51.7 + uTime * 1.6));
+  // Repel adds a whisper of warmth — otherwise strictly grayscale
+  vec3 col = mix(vec3(vShade), vec3(1.02, 0.94, 0.82), vRepel * 0.6);
 
-  gl_FragColor = vec4(col, core * twinkle * 0.85);
+  gl_FragColor = vec4(col, clamp(alpha, 0.0, 1.0));
 }
 `;
 
-// Rejection-sample a dense point cloud inside the brilliant-cut profile
-function sampleDiamondCloud(count) {
-  // Same profile as loader.js — table/crown/girdle/pavilion/culet
-  const yMin = -1.10, yMax = 0.55;
-  const rAt = (y) => {
-    if (y > 0.55 || y < -1.10) return 0;
-    if (y >= 0.10) {
-      const t = (0.55 - y) / (0.55 - 0.10);
-      return 0.42 + (1.00 - 0.42) * t;
-    }
-    const t = (0.10 - y) / (0.10 - (-1.10));
-    return 1.00 * (1 - t);
-  };
-  const positions = new Float32Array(count * 3);
-  const seeds     = new Float32Array(count);
-  let i = 0;
-  while (i < count) {
-    const y = yMin + Math.random() * (yMax - yMin);
-    const rMax = rAt(y);
-    if (rMax <= 0) continue;
-    const r     = Math.sqrt(Math.random()) * rMax;
-    const theta = Math.random() * Math.PI * 2;
-    positions[i * 3    ] = Math.cos(theta) * r;
-    positions[i * 3 + 1] = y;
-    positions[i * 3 + 2] = Math.sin(theta) * r;
-    seeds[i] = Math.random();
-    i++;
+// Sample points on the brilliant-cut *surface*, area-weighted, with each
+// point carrying its face normal. Also snap a fraction of them to facet
+// edges so the outline reads sharply.
+function sampleDiamondSurface(mesh, surfaceCount, edgeCount) {
+  const geom    = mesh.geometry;
+  const posAttr = geom.getAttribute("position");
+  const idxAttr = geom.getIndex();
+  const triN    = idxAttr.count / 3;
+
+  const v0 = new THREE.Vector3(), v1 = new THREE.Vector3(), v2 = new THREE.Vector3();
+  const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), n = new THREE.Vector3();
+
+  const areas = new Float32Array(triN);
+  const norms = [];
+  let total = 0;
+  for (let t = 0; t < triN; t++) {
+    v0.fromBufferAttribute(posAttr, idxAttr.getX(t * 3    ));
+    v1.fromBufferAttribute(posAttr, idxAttr.getX(t * 3 + 1));
+    v2.fromBufferAttribute(posAttr, idxAttr.getX(t * 3 + 2));
+    e1.subVectors(v1, v0);
+    e2.subVectors(v2, v0);
+    n.copy(e1).cross(e2);
+    const area = n.length() * 0.5;
+    areas[t] = area;
+    total += area;
+    n.normalize();
+    norms.push([n.x, n.y, n.z]);
   }
-  return { positions, seeds };
+
+  const totalCount = surfaceCount + edgeCount;
+  const positions  = new Float32Array(totalCount * 3);
+  const normals    = new Float32Array(totalCount * 3);
+  const seeds      = new Float32Array(totalCount);
+  const edgeMark   = new Float32Array(totalCount);
+
+  const write = (i, p, nrm, isEdge) => {
+    positions[i * 3    ] = p[0];
+    positions[i * 3 + 1] = p[1];
+    positions[i * 3 + 2] = p[2];
+    normals  [i * 3    ] = nrm[0];
+    normals  [i * 3 + 1] = nrm[1];
+    normals  [i * 3 + 2] = nrm[2];
+    seeds[i]    = Math.random();
+    edgeMark[i] = isEdge;
+  };
+
+  // Interior barycentric samples
+  for (let i = 0; i < surfaceCount; i++) {
+    let r = Math.random() * total;
+    let ti = 0;
+    while (r > areas[ti] && ti < triN - 1) { r -= areas[ti]; ti++; }
+    const a = idxAttr.getX(ti * 3    );
+    const b = idxAttr.getX(ti * 3 + 1);
+    const c = idxAttr.getX(ti * 3 + 2);
+    v0.fromBufferAttribute(posAttr, a);
+    v1.fromBufferAttribute(posAttr, b);
+    v2.fromBufferAttribute(posAttr, c);
+    let u = Math.random(), vv = Math.random();
+    if (u + vv > 1) { u = 1 - u; vv = 1 - vv; }
+    const px = v0.x + u * (v1.x - v0.x) + vv * (v2.x - v0.x);
+    const py = v0.y + u * (v1.y - v0.y) + vv * (v2.y - v0.y);
+    const pz = v0.z + u * (v1.z - v0.z) + vv * (v2.z - v0.z);
+    write(i, [px, py, pz], norms[ti], 0.0);
+  }
+
+  // Edge-snapped samples — points along the shared edges of each triangle
+  for (let i = 0; i < edgeCount; i++) {
+    const ti = Math.floor(Math.random() * triN);
+    const a = idxAttr.getX(ti * 3    );
+    const b = idxAttr.getX(ti * 3 + 1);
+    const c = idxAttr.getX(ti * 3 + 2);
+    v0.fromBufferAttribute(posAttr, a);
+    v1.fromBufferAttribute(posAttr, b);
+    v2.fromBufferAttribute(posAttr, c);
+    // Pick one of three edges, then a random position along it
+    const eIdx = Math.floor(Math.random() * 3);
+    const pA = eIdx === 0 ? v0 : (eIdx === 1 ? v1 : v2);
+    const pB = eIdx === 0 ? v1 : (eIdx === 1 ? v2 : v0);
+    const s  = Math.random();
+    const px = pA.x + (pB.x - pA.x) * s;
+    const py = pA.y + (pB.y - pA.y) * s;
+    const pz = pA.z + (pB.z - pA.z) * s;
+    write(surfaceCount + i, [px, py, pz], norms[ti], 1.0);
+  }
+
+  return { positions, normals, seeds, edgeMark };
 }
 
 const MANIFESTO = [
@@ -577,33 +640,42 @@ export class Philosophy {
   }
 
   _createDiamond() {
-    // Particle-based diamond — dense point cloud sampled inside the profile,
-    // driven by an interactive vertex shader (idle turbulence + mouse repel).
-    const count = this._isMobile ? Math.floor(PARTICLE_COUNT * 0.55) : PARTICLE_COUNT;
-    const { positions, seeds } = sampleDiamondCloud(count);
+    // Build the brilliant-cut mesh first, then sample its SURFACE (not the
+    // interior) so particles trace facets. Each point carries its face normal
+    // so the vertex shader can compute grayscale depth (rim bright, back dark).
+    const solid = this._createBrilliantGeometry(28);
+    solid.scale(1.25, 1.4, 1.25);
+    const solidMesh = new THREE.Mesh(solid);   // wrapper only — never added to scene
+
+    const surface = this._isMobile ? Math.floor(PARTICLE_COUNT * 0.55) : PARTICLE_COUNT;
+    const edge    = Math.floor(surface * EDGE_PARTICLE_MULT);
+    const { positions, normals, seeds, edgeMark } = sampleDiamondSurface(solidMesh, surface, edge);
 
     const geom = new THREE.BufferGeometry();
     geom.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    geom.setAttribute("aSeed",    new THREE.Float32BufferAttribute(seeds, 1));
-    // Fill the viewport dominantly — same silhouette scale as before
-    geom.scale(1.25, 1.4, 1.25);
+    geom.setAttribute("aNormal",  new THREE.Float32BufferAttribute(normals,   3));
+    geom.setAttribute("aSeed",    new THREE.Float32BufferAttribute(seeds,     1));
+    geom.setAttribute("aEdge",    new THREE.Float32BufferAttribute(edgeMark,  1));
 
     const mat = new THREE.ShaderMaterial({
       vertexShader:   PARTICLE_VERT,
       fragmentShader: PARTICLE_FRAG,
       uniforms: {
         uTime:       { value: 0 },
-        uMouseLocal: { value: new THREE.Vector3(999, 999, 999) },  // out-of-range on load
+        uMouseLocal: { value: new THREE.Vector3(999, 999, 999) },
         uPixel:      { value: Math.min(window.devicePixelRatio || 1, 2) },
       },
       transparent: true,
       depthWrite:  false,
-      blending:    THREE.AdditiveBlending,
+      blending:    THREE.NormalBlending,   // don't clip to white — respect grayscale
     });
 
     this.diamond = new THREE.Points(geom, mat);
     this.diamond.rotation.x = -0.18;
     this.scene.add(this.diamond);
+
+    // Dispose the wrapper mesh's geometry — attributes are copied into the point cloud
+    solid.dispose();
   }
 
   _createBrilliantGeometry(N = 24) {
