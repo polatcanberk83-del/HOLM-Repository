@@ -333,8 +333,7 @@ export class Philosophy {
       this._heroPlane.material.map?.dispose();
       this._heroPlane.material.dispose();
     }
-    if (this.envMap)       this.envMap.dispose();
-    if (this._backdropTex) this._backdropTex.dispose();
+    if (this.envMap) this.envMap.dispose();
     for (const l of this._lights) this.scene?.remove(l);
 
     if (this.renderer) {
@@ -512,71 +511,10 @@ export class Philosophy {
   }
 
   _buildBackdrop() {
-    // Deep-space canvas: near-black base + subtle warm/cool nebula gradient
-    // + a scatter of pinpoint stars. Gives the diamond's transmission
-    // something rich to refract — the reason the reference gem has that
-    // "texture" is the sunset behind it doing exactly this job.
-    const cv  = document.createElement("canvas");
-    cv.width  = 2048;
-    cv.height = 2048;
-    const ctx = cv.getContext("2d");
-
-    // Base fill
-    ctx.fillStyle = "#000000";
-    ctx.fillRect(0, 0, 2048, 2048);
-
-    // Cool nebula bloom, upper-left
-    const cool = ctx.createRadialGradient(720, 700, 30, 720, 700, 1000);
-    cool.addColorStop(0.00, "rgba(60, 90, 160, 0.55)");
-    cool.addColorStop(0.35, "rgba(30, 46, 96, 0.25)");
-    cool.addColorStop(1.00, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = cool;
-    ctx.fillRect(0, 0, 2048, 2048);
-
-    // Warm nebula bloom, lower-right
-    const warm = ctx.createRadialGradient(1400, 1300, 30, 1400, 1300, 950);
-    warm.addColorStop(0.00, "rgba(220, 120, 60, 0.45)");
-    warm.addColorStop(0.30, "rgba(140, 60, 40, 0.22)");
-    warm.addColorStop(1.00, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = warm;
-    ctx.fillRect(0, 0, 2048, 2048);
-
-    // Faint magenta accent, top-right
-    const mag = ctx.createRadialGradient(1650, 400, 20, 1650, 400, 550);
-    mag.addColorStop(0.00, "rgba(180, 80, 160, 0.30)");
-    mag.addColorStop(1.00, "rgba(0, 0, 0, 0)");
-    ctx.fillStyle = mag;
-    ctx.fillRect(0, 0, 2048, 2048);
-
-    // Star field — scatter thousands of pinpoints of varying brightness
-    for (let i = 0; i < 2600; i++) {
-      const x  = Math.random() * 2048;
-      const y  = Math.random() * 2048;
-      const b  = Math.random();
-      const sz = b > 0.985 ? 2.4 : b > 0.9 ? 1.6 : 1.0;
-      const a  = 0.25 + b * 0.75;
-      ctx.fillStyle = `rgba(255, 245, 230, ${a.toFixed(3)})`;
-      ctx.fillRect(x, y, sz, sz);
-    }
-
-    // Handful of "hero" stars with a soft halo
-    for (let i = 0; i < 30; i++) {
-      const x = Math.random() * 2048;
-      const y = Math.random() * 2048;
-      const halo = ctx.createRadialGradient(x, y, 0.4, x, y, 14);
-      halo.addColorStop(0, "rgba(255, 250, 235, 0.9)");
-      halo.addColorStop(1, "rgba(255, 250, 235, 0)");
-      ctx.fillStyle = halo;
-      ctx.fillRect(x - 14, y - 14, 28, 28);
-    }
-
-    const tex = new THREE.CanvasTexture(cv);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    tex.minFilter  = THREE.LinearFilter;
-    tex.magFilter  = THREE.LinearFilter;
-    tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
-    this._backdropTex = tex;
-    return tex;
+    // Flat pure-black scene background — the diamond's texture comes from
+    // its own material + the env map (used for both reflection AND
+    // transmission fallback), not from anything visible behind it.
+    return new THREE.Color(0x000000);
   }
 
   _buildProceduralEnv() {
