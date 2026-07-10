@@ -116,7 +116,7 @@ export class Menu {
               <span class="holm-menu__row-inner">
                 <a class="holm-menu__link" href="${r.href}" data-idx="${i}">
                   <span class="holm-menu__num">${r.num}</span>
-                  <span class="holm-menu__name">${r.name}</span>
+                  <span class="holm-menu__name" data-hover-roll>${r.name}</span>
                 </a>
               </span>
             </li>

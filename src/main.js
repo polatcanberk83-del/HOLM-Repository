@@ -327,6 +327,8 @@ initHoverRoll(document);
 if (import.meta.env.DEV) {
   const menu = new Menu({ lenis });
   menu.mount();
+  // Re-scan for [data-hover-roll] targets now that the menu DOM exists
+  initHoverRoll(document);
   const bookCall = document.getElementById("book-call");
   if (bookCall) bookCall.style.display = "none";
 }

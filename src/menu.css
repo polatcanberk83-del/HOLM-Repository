@@ -134,6 +134,13 @@
   line-height: 1;
 }
 
+/* Hover-roll fires from the parent link, so hovering the number/row still
+   drives the label's staggered copy cascade. */
+.holm-menu__link:hover .holm-menu__name .hover-roll__char,
+.holm-menu__link:focus-visible .holm-menu__name .hover-roll__char {
+  transform: translateY(-100%);
+}
+
 /* Active room indicator — dot next to the number */
 .holm-menu__row.is-active .holm-menu__name  { color: rgba(255, 255, 255, 1.0); }
 .holm-menu__row.is-active .holm-menu__num   { color: rgba(220, 232, 250, 0.85); }

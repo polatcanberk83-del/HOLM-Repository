@@ -79,7 +79,7 @@
   font-size: clamp(1.65rem, 3.4vw, 2.7rem);
   line-height: 1.28;
   letter-spacing: 0.004em;
-  color: rgba(240, 246, 255, 0.96);
+  color: #ffffff;
   text-shadow: 0 1px 30px rgba(0, 0, 0, 0.5);
 }
 
