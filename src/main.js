@@ -7,6 +7,7 @@ import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel, setLoadingManager } from "./three/loader.js";
 import { Loader }                       from "./loader.js";
 import { Menu }                         from "./menu.js";
+import { initHoverRoll }                from "./hoverRoll.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
@@ -318,6 +319,9 @@ const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
 });
 gsap.ticker.lagSmoothing(0);
+
+// Wrap every [data-hover-roll] target with the two-line stagger effect
+initHoverRoll(document);
 
 // Dev-only room-guide menu — production ships with the "Book a call" button
 // visible instead. On localhost we mount the menu and hide book-a-call so

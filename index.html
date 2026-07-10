@@ -88,33 +88,22 @@
         font-size: 0.72rem;
         font-weight: 300;
         letter-spacing: 0.16em;
-        color: rgba(215, 230, 255, 0.8);
-        border: 1px solid rgba(215, 230, 255, 0.22);
+        color: rgba(214, 96, 88, 0.92);
+        border: 1px solid rgba(180, 60, 52, 0.42);
         padding: 9px 20px;
         text-decoration: none;
         pointer-events: auto;
-        overflow: hidden;
-        transition: color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease;
+        transition: color 0.4s ease, border-color 0.4s ease, box-shadow 0.4s ease, background 0.4s ease;
         white-space: nowrap;
+        background: rgba(120, 24, 20, 0.06);
       }
-      #book-call::before {
-        content: '';
-        position: absolute;
-        inset: 0;
-        background: linear-gradient(105deg,
-          rgba(200, 220, 255, 0.12) 0%,
-          rgba(180, 205, 255, 0.05) 100%);
-        transform: scaleX(0);
-        transform-origin: left center;
-        transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
-      }
-      #book-call:hover::before { transform: scaleX(1); }
       #book-call:hover {
-        color: rgba(230, 242, 255, 1.0);
-        border-color: rgba(210, 228, 255, 0.6);
+        color: rgba(240, 200, 195, 1.0);
+        border-color: rgba(220, 90, 82, 0.75);
+        background: rgba(140, 30, 26, 0.14);
         box-shadow:
-          0 0 24px rgba(170, 205, 255, 0.22),
-          0 0 60px rgba(170, 205, 255, 0.08);
+          0 0 24px rgba(200, 70, 60, 0.22),
+          0 0 60px rgba(200, 70, 60, 0.10);
       }
       @media (max-width: 767px) {
         #book-call {
@@ -223,28 +212,6 @@
       }
       .proj-cta:hover::before { transform: scaleX(1); }
 
-      .proj-cta-text,
-      .proj-cta-text-hover {
-        display: block;
-        position: relative;
-        z-index: 1;
-        transition: transform 0.5s cubic-bezier(0.76, 0, 0.24, 1);
-        will-change: transform;
-      }
-
-      .proj-cta-text-hover {
-        position: absolute;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        font-style: italic;
-        transform: translateY(115%);
-      }
-
-      .proj-cta:hover .proj-cta-text       { transform: translateY(-115%); }
-      .proj-cta:hover .proj-cta-text-hover  { transform: translateY(0); }
-
       .proj-cta:hover {
         color: rgba(230, 242, 255, 1.0);
         border-color: rgba(210, 228, 255, 0.72);
@@ -313,7 +280,6 @@
           margin-top: 2.2rem;
           letter-spacing: 0.14em;
         }
-        .proj-cta-text-hover { display: none; }
       }
 
       /* ── Small phones (≤375px) ───────────────────────────────────── */
@@ -415,9 +381,8 @@
     <a id="book-call"
        href="https://cal.com/canberk-polat-dpsl0y/discovery-call"
        target="_blank"
-       rel="noopener noreferrer">
-      Book a call
-    </a>
+       rel="noopener noreferrer"
+       data-hover-roll>Book a call</a>
 
 <div class="caption-layer">
       <div class="caption" id="caption"></div>
@@ -437,10 +402,9 @@
       <a class="proj-cta"
          href="https://cal.com/canberk-polat-dpsl0y/discovery-call"
          target="_blank"
-         rel="noopener noreferrer">
-        <span class="proj-cta-text">Let's make the moment</span>
-        <span class="proj-cta-text-hover">Book a call →</span>
-      </a>
+         rel="noopener noreferrer"
+         data-hover-roll="Let's make the moment"
+         data-hover-roll-copy="Book a call →">Let's make the moment</a>
     </div>
 
     <!-- Gathering sequence -->

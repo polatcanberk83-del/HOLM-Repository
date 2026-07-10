@@ -53,6 +53,7 @@
 
 body.holm-loading .wordmark,
 body.holm-loading .holm-menu,
+body.holm-loading #book-call,
 body.holm-loading .scroll-hint,
 body.holm-loading .proj-cta,
 body.holm-loading #caption,
@@ -64,6 +65,7 @@ body.holm-loading #gathering-text {
 /* Smooth fade-back once the loader releases the class */
 .wordmark,
 .holm-menu,
+#book-call,
 .scroll-hint,
 .proj-cta {
   transition: opacity 0.8s ease;

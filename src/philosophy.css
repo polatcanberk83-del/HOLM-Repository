@@ -131,68 +131,6 @@
     0 0 0 1px rgba(255, 255, 255, 0.10) inset;
 }
 
-/* ─── Outer stroke ring — expands + rotates on hover ────────────── */
-.holm-philosophy__cta-ring {
-  position: absolute;
-  inset: -10px;
-  border-radius: 50%;
-  border: 1px solid rgba(240, 246, 255, 0.42);
-  opacity: 0;
-  transform: scale(0.88) rotate(-14deg);
-  transition:
-    opacity 0.45s ease,
-    transform 0.8s cubic-bezier(0.34, 1.36, 0.5, 1);
-  pointer-events: none;
-}
-.holm-philosophy__cta:hover .holm-philosophy__cta-ring,
-.holm-philosophy__cta.is-magnetic .holm-philosophy__cta-ring {
-  opacity: 1;
-  transform: scale(1) rotate(24deg);
-}
-
-/* ─── Inner content wrapper — receives parallax offset ──────────── */
-.holm-philosophy__cta-inner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 100%;
-  height: 100%;
-  will-change: transform;
-}
-
-/* ─── Text roll — "Let's talk" slides out, arrow slides in ─────── */
-.holm-philosophy__cta-stack {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  height: 1.35em;
-  overflow: hidden;
-  transition: transform 0.55s cubic-bezier(0.65, 0, 0.35, 1);
-  will-change: transform;
-}
-.holm-philosophy__cta:hover .holm-philosophy__cta-stack,
-.holm-philosophy__cta.is-magnetic .holm-philosophy__cta-stack {
-  transform: translateY(-1.35em);
-}
-
-.holm-philosophy__cta-label {
-  flex-shrink: 0;
-  height: 1.35em;
-  line-height: 1.35em;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 0.6em;
-  white-space: nowrap;
-}
-.holm-philosophy__cta-label--arrow {
-  font-style: normal;
-}
-.holm-philosophy__cta-label--arrow svg {
-  display: block;
-}
-
 /* ─── Mobile / narrow: collapse side layout, stack diamond + text ── */
 @media (max-width: 767px) {
   .holm-philosophy__beat {

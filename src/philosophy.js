@@ -374,19 +374,10 @@ export class Philosophy {
           </div>
         `).join("");
         const ctaHtml = isFinal ? `
-          <a class="holm-philosophy__cta" href="${CTA_HREF}" aria-label="${CTA_LABEL}">
-            <span class="holm-philosophy__cta-ring" aria-hidden="true"></span>
-            <span class="holm-philosophy__cta-inner">
-              <span class="holm-philosophy__cta-stack">
-                <span class="holm-philosophy__cta-label">${CTA_LABEL}</span>
-                <span class="holm-philosophy__cta-label holm-philosophy__cta-label--arrow" aria-hidden="true">
-                  <svg viewBox="0 0 24 24" width="1.15em" height="1.15em" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M5 12 H19"/><path d="M13 6 L19 12 L13 18"/>
-                  </svg>
-                </span>
-              </span>
-            </span>
-          </a>
+          <a class="holm-philosophy__cta"
+             href="${CTA_HREF}"
+             aria-label="${CTA_LABEL}"
+             data-hover-roll>${CTA_LABEL}</a>
         ` : "";
         return `
           <section class="holm-philosophy__beat"
@@ -442,7 +433,7 @@ export class Philosophy {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.5 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.05;
+    this.renderer.toneMappingExposure = 0.55;
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
@@ -473,9 +464,9 @@ export class Philosophy {
     this._composer.addPass(new RenderPass(this.scene, this.camera));
     this._bloom = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.85,   // strength
-      0.55,   // radius
-      0.82,   // threshold — only the brightest highlights bloom
+      0.28,   // strength — a whisper, not a wash
+      0.35,   // radius
+      0.98,   // threshold — only near-white pixels bloom
     );
     this._composer.addPass(this._bloom);
     this._composer.addPass(new OutputPass());
@@ -716,19 +707,14 @@ export class Philosophy {
   // ── CTA magnetic hover ─────────────────────────────────────────
   _bindCtaMagnetic() {
     if (this._reducedMotion) return;
-    const cta   = this.container.querySelector(".holm-philosophy__cta");
-    const inner = this.container.querySelector(".holm-philosophy__cta-inner");
-    if (!cta || !inner) return;
+    const cta = this.container.querySelector(".holm-philosophy__cta");
+    if (!cta) return;
 
     this._ctaEl = cta;
-    gsap.set(cta,   { opacity: 0, x: 0, y: 0 });
-    gsap.set(inner, { x: 0, y: 0 });
+    gsap.set(cta, { opacity: 0, x: 0, y: 0 });
 
-    // quickTo returns a highly optimized setter for repeated tweens
-    this._ctaSetX      = gsap.quickTo(cta,   "x", { duration: 0.55, ease: "power3" });
-    this._ctaSetY      = gsap.quickTo(cta,   "y", { duration: 0.55, ease: "power3" });
-    this._ctaInnerSetX = gsap.quickTo(inner, "x", { duration: 0.75, ease: "power3" });
-    this._ctaInnerSetY = gsap.quickTo(inner, "y", { duration: 0.75, ease: "power3" });
+    this._ctaSetX = gsap.quickTo(cta, "x", { duration: 0.55, ease: "power3" });
+    this._ctaSetY = gsap.quickTo(cta, "y", { duration: 0.55, ease: "power3" });
 
     this._ctaMove = (e) => {
       const rect = cta.getBoundingClientRect();
@@ -737,25 +723,22 @@ export class Philosophy {
       const dx   = e.clientX - cx;
       const dy   = e.clientY - cy;
       const dist = Math.hypot(dx, dy);
-      const R    = rect.width * 1.35;         // magnetic reach: 1.35× radius
+      const R    = rect.width * 1.35;
       if (dist > R) {
-        this._ctaSetX(0);      this._ctaSetY(0);
-        this._ctaInnerSetX(0); this._ctaInnerSetY(0);
+        this._ctaSetX(0);
+        this._ctaSetY(0);
         cta.classList.remove("is-magnetic");
         return;
       }
       const pull = (1 - dist / R) * 0.4;
       this._ctaSetX(dx * pull);
       this._ctaSetY(dy * pull);
-      // Inner parallax — text drifts opposite for depth
-      this._ctaInnerSetX(dx * pull * 0.35);
-      this._ctaInnerSetY(dy * pull * 0.35);
       cta.classList.add("is-magnetic");
     };
 
     this._ctaLeave = () => {
-      this._ctaSetX(0);      this._ctaSetY(0);
-      this._ctaInnerSetX(0); this._ctaInnerSetY(0);
+      this._ctaSetX(0);
+      this._ctaSetY(0);
       cta.classList.remove("is-magnetic");
     };
 
