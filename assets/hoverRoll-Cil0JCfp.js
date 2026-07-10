@@ -4271,7 +4271,7 @@ void main() {
               <span class="holm-menu__row-inner">
                 <a class="holm-menu__link" href="${e.href}" data-idx="${t}">
                   <span class="holm-menu__num">${e.num}</span>
-                  <span class="holm-menu__name">${e.name}</span>
+                  <span class="holm-menu__name" data-hover-roll>${e.name}</span>
                 </a>
               </span>
             </li>
