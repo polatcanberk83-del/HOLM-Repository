@@ -114,21 +114,6 @@
         }
       }
 
-      /* ── Scroll hint ─────────────────────────────────────────────── */
-      .scroll-hint {
-        position: fixed;
-        bottom: 4vh;
-        left: 0;
-        width: 100%;
-        text-align: center;
-        z-index: 3;
-        font-size: 0.65rem;
-        letter-spacing: 0.22em;
-        font-family: 'Helvetica Neue', Arial, sans-serif;
-        opacity: 0.45;
-        transition: opacity 0.7s ease;
-        pointer-events: none;
-      }
 
       /* ── Projection overlay ──────────────────────────────────────── */
       #projection-overlay {
@@ -246,13 +231,6 @@
         /* Wordmark */
         .wordmark { top: 5vh; left: 5vw; }
         .wm-logo  { width: clamp(50px, 12vw, 78px); }
-
-        /* Scroll hint */
-        .scroll-hint {
-          font-size: 0.55rem;
-          letter-spacing: 0.18em;
-          bottom: 5vh;
-        }
 
         /* Projection overlay */
         #projection-overlay {
@@ -388,7 +366,6 @@
       <div class="caption" id="caption"></div>
     </div>
 
-    <div class="scroll-hint" id="scroll-hint">SCROLL TO EXPLORE</div>
 
     <!-- Projection section overlay -->
     <div id="projection-overlay">

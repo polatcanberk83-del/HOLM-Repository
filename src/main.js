@@ -40,7 +40,6 @@ const canvas          = document.getElementById("scene-canvas");
 const captionEl       = document.getElementById("caption");
 const gatheringTextEl = document.getElementById("gathering-text");
 const wordmarkEl      = document.querySelector(".wordmark");
-const scrollHintEl    = document.getElementById("scroll-hint");
 
 // ---------- Three.js ----------
 const { scene, renderer, camera, spotLight, armSpot, ambient, hemi, wallUniforms, onResize } = createScene(canvas, isMobile);
@@ -307,7 +306,6 @@ function hideProjection() {
 }
 
 // ---------- Lenis ----------
-if (isMobile) scrollHintEl.textContent = "SWIPE TO EXPLORE";
 const lenis = new Lenis(isMobile ? {
   smoothTouch:     false,
   touchMultiplier: 0.65,
@@ -333,13 +331,8 @@ if (import.meta.env.DEV) {
   if (bookCall) bookCall.style.display = "none";
 }
 
-let _scrollHintHidden = false;
 lenis.on("scroll", ({ scroll, limit }) => {
   splineT = limit > 0 ? scroll / limit : 0;
-  if (!_scrollHintHidden && scroll > 80) {
-    _scrollHintHidden = true;
-    gsap.to(scrollHintEl, { opacity: 0, duration: 0.8, ease: "power2.out" });
-  }
 });
 
 // ---------- Render döngüsü ----------
