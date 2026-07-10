@@ -548,7 +548,7 @@ export class Philosophy {
   _createDiamond() {
     // Brilliant-cut mesh, higher tessellation for cleaner facets
     const geom = this._createBrilliantGeometry(48);
-    geom.scale(1.00, 1.15, 1.00);
+    geom.scale(0.92, 1.06, 0.92);
     geom.computeVertexNormals();
 
     // MeshPhysicalMaterial tuned for the RoomEnvironment PMREM.
