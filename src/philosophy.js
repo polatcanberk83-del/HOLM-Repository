@@ -11,6 +11,172 @@ import "./philosophy.css";
 const IDLE_SPIN_SPEED    = 0.16;       // rad/s — never stops
 const POS_LERP           = 0.09;       // per-frame lerp toward beat target (@60fps)
 const SCROLL_TILT_MAX    = 0.18;       // rad — X tilt at scroll = 1
+
+// ─── Fluid gradient backdrop tunables ────────────────────────────────
+const FLUID_RES_SCALE   = 0.5;         // fraction of viewport for sim (perf)
+const FLUID_BRUSH_SIZE  = 22.0;
+const FLUID_BRUSH_STR   = 0.30;
+const FLUID_DECAY       = 0.985;
+const FLUID_TRAIL       = 0.90;
+const FLUID_STOP_DECAY  = 0.92;
+const FLUID_DISTORTION  = 1.6;
+const FLUID_INTENSITY   = 0.85;
+const FLUID_SOFTNESS    = 1.4;
+const FLUID_COLOR_1     = "#000000";
+const FLUID_COLOR_2     = "#050d24";
+const FLUID_COLOR_3     = "#0e3277";
+const FLUID_COLOR_4     = "#3672d6";
+
+// ─── Fluid shaders (adapted from an interactive-gradient reference) ──
+const FLUID_VERT = /* glsl */`
+varying vec2 vUv;
+void main() {
+  vUv = uv;
+  gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+}
+`;
+
+const FLUID_FRAG = /* glsl */`
+uniform float     iTime;
+uniform vec2      iResolution;
+uniform vec4      iMouse;
+uniform int       iFrame;
+uniform sampler2D iPreviousFrame;
+uniform float     uBrushSize;
+uniform float     uBrushStrength;
+uniform float     uFluidDecay;
+uniform float     uTrailLength;
+uniform float     uStopDecay;
+varying vec2      vUv;
+
+vec2 ur, U;
+
+float ln(vec2 p, vec2 a, vec2 b) {
+  return length(p - a - (b - a) * clamp(dot(p - a, b - a) / dot(b - a, b - a), 0.0, 1.0));
+}
+vec4 t(vec2 v, int a, int b) {
+  return texture2D(iPreviousFrame, fract((v + vec2(float(a), float(b))) / ur));
+}
+vec4 t(vec2 v) {
+  return texture2D(iPreviousFrame, fract(v / ur));
+}
+float area(vec2 a, vec2 b, vec2 c) {
+  float A = length(b - c), B = length(c - a), C = length(a - b), s = 0.5 * (A + B + C);
+  return sqrt(s * (s - A) * (s - B) * (s - C));
+}
+
+void main() {
+  U  = vUv * iResolution;
+  ur = iResolution.xy;
+  if (iFrame < 1) {
+    float w = 0.5 + sin(0.2 * U.x) * 0.5;
+    float q = length(U - 0.5 * ur);
+    gl_FragColor = vec4(0.1 * exp(-0.001 * q * q), 0.0, 0.0, w);
+  } else {
+    vec2 v = U,
+         A = v + vec2( 1.0,  1.0),
+         B = v + vec2( 1.0, -1.0),
+         C = v + vec2(-1.0,  1.0),
+         D = v + vec2(-1.0, -1.0);
+    for (int i = 0; i < 8; i++) {
+      v -= t(v).xy;
+      A -= t(A).xy;
+      B -= t(B).xy;
+      C -= t(C).xy;
+      D -= t(D).xy;
+    }
+    vec4 me = t(v);
+    vec4 n = t(v, 0, 1),
+         e = t(v, 1, 0),
+         s = t(v, 0, -1),
+         w = t(v, -1, 0);
+    vec4 ne = 0.25 * (n + e + s + w);
+    me = mix(t(v), ne, vec4(0.15, 0.15, 0.95, 0.0));
+    me.z = me.z - 0.01 * ((area(A, B, C) + area(B, C, D)) - 4.0);
+    vec4 pr = vec4(e.z, w.z, n.z, s.z);
+    me.xy = me.xy + 100.0 * vec2(pr.x - pr.y, pr.z - pr.w) / ur;
+    me.xy *= uFluidDecay;
+    me.z  *= uTrailLength;
+
+    if (iMouse.z > 0.0) {
+      vec2  mousePos = iMouse.xy;
+      vec2  mousePrev = iMouse.zw;
+      vec2  mouseVel = mousePos - mousePrev;
+      float velMag   = length(mouseVel);
+      float q        = ln(U, mousePos, mousePrev);
+      vec2  m        = mousePos - mousePrev;
+      float l        = length(m);
+      if (l > 0.0) m = min(l, 10.0) * m / l;
+      float brushSizeFactor = 1e-4 / uBrushSize;
+      float strengthFactor  = 0.03 * uBrushStrength;
+      float falloff = exp(-brushSizeFactor * q * q * q);
+      falloff = pow(falloff, 0.5);
+      me.xyw += strengthFactor * falloff * vec3(m, 10.0);
+      if (velMag < 2.0) {
+        float distToCursor = length(U - mousePos);
+        float influence    = exp(-distToCursor * 0.01);
+        float cursorDecay  = mix(1.0, uStopDecay, influence);
+        me.xy *= cursorDecay;
+        me.z  *= cursorDecay;
+      }
+    }
+    gl_FragColor = clamp(me, -0.4, 0.4);
+  }
+}
+`;
+
+const FLUID_DISPLAY_FRAG = /* glsl */`
+uniform float     iTime;
+uniform vec2      iResolution;
+uniform sampler2D iFluid;
+uniform float     uDistortionAmount;
+uniform vec3      uColor1;
+uniform vec3      uColor2;
+uniform vec3      uColor3;
+uniform vec3      uColor4;
+uniform float     uColorIntensity;
+uniform float     uSoftness;
+varying vec2      vUv;
+
+void main() {
+  vec2 fragCoord = vUv * iResolution;
+  vec4 fluid = texture2D(iFluid, vUv);
+  vec2 fluidVel = fluid.xy;
+  float mr = min(iResolution.x, iResolution.y);
+  vec2 uv = (fragCoord * 2.0 - iResolution.xy) / mr;
+  uv += fluidVel * (0.5 * uDistortionAmount);
+
+  float d = -iTime * 0.5;
+  float a = 0.0;
+  for (float i = 0.0; i < 8.0; ++i) {
+    a += cos(i - d - a * uv.x);
+    d += sin(uv.y * i + a);
+  }
+  d += iTime * 0.5;
+
+  float mixer1 = cos(uv.x * d) * 0.5 + 0.5;
+  float mixer2 = cos(uv.y * a) * 0.5 + 0.5;
+  float mixer3 = sin(d + a) * 0.5 + 0.5;
+
+  float smoothAmount = clamp(uSoftness * 0.1, 0.0, 0.9);
+  mixer1 = mix(mixer1, 0.5, smoothAmount);
+  mixer2 = mix(mixer2, 0.5, smoothAmount);
+  mixer3 = mix(mixer3, 0.5, smoothAmount);
+
+  vec3 col = mix(uColor1, uColor2, mixer1);
+  col = mix(col, uColor3, mixer2);
+  col = mix(col, uColor4, mixer3 * 0.4);
+  col *= uColorIntensity;
+  gl_FragColor = vec4(col, 1.0);
+}
+`;
+
+function hexToVec3(hex) {
+  const r = parseInt(hex.slice(1, 3), 16) / 255;
+  const g = parseInt(hex.slice(3, 5), 16) / 255;
+  const b = parseInt(hex.slice(5, 7), 16) / 255;
+  return new THREE.Vector3(r, g, b);
+}
 const CAM_Z_BASE         = 5.6;
 
 // Diamond material — pushed brighter/gemmier now that text lives beside it
@@ -301,6 +467,20 @@ export class Philosophy {
     // Elapsed time driven off dt so we're timeline-consistent
     this._elapsed = 0;
 
+    // Fluid gradient backdrop
+    this._fluidQuadCam    = null;
+    this._fluidQuadScene  = null;
+    this._fluidQuadMesh   = null;
+    this._fluidMat        = null;
+    this._displayMat      = null;
+    this._fluidTargetA    = null;
+    this._fluidTargetB    = null;
+    this._displayTarget   = null;
+    this._fluidFrame      = 0;
+    this._mousePx         = new THREE.Vector2(0, 0);
+    this._prevMousePx     = new THREE.Vector2(0, 0);
+    this._lastMouseMoveMs = 0;
+
     // Handlers
     this._onResize       = this._onResize.bind(this);
     this._onLenisScroll  = this._onLenisScroll.bind(this);
@@ -329,6 +509,19 @@ export class Philosophy {
       (e.clientX / window.innerWidth) * 2 - 1,
       -((e.clientY / window.innerHeight) * 2 - 1),
     );
+    // Fluid input is in the fluid-sim texel space (half-viewport res, y-up)
+    if (this._fluidMat) {
+      const w = window.innerWidth,  h = window.innerHeight;
+      const sx = e.clientX * FLUID_RES_SCALE;
+      const sy = (h - e.clientY) * FLUID_RES_SCALE;
+      this._prevMousePx.copy(this._mousePx);
+      this._mousePx.set(sx, sy);
+      this._lastMouseMoveMs = performance.now();
+      this._fluidMat.uniforms.iMouse.value.set(
+        this._mousePx.x, this._mousePx.y,
+        this._prevMousePx.x, this._prevMousePx.y,
+      );
+    }
   }
 
   destroy() {
@@ -356,6 +549,14 @@ export class Philosophy {
     }
     if (this.envMap) this.envMap.dispose();
     for (const l of this._lights) this.scene?.remove(l);
+
+    // Fluid resources
+    this._fluidTargetA?.dispose();
+    this._fluidTargetB?.dispose();
+    this._displayTarget?.dispose();
+    this._fluidMat?.dispose();
+    this._displayMat?.dispose();
+    this._fluidQuadMesh?.geometry?.dispose();
 
     if (this.renderer) {
       this.renderer.dispose();
@@ -451,7 +652,9 @@ export class Philosophy {
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    this.scene.background = this._buildBackdrop();
+    // Fluid gradient — set as scene.background each frame after simulation step
+    this._initFluid();
+    this.scene.background = this._displayTarget.texture;
 
     this.camera = new THREE.PerspectiveCamera(
       36, window.innerWidth / window.innerHeight, 0.1, 100,
@@ -538,11 +741,108 @@ export class Philosophy {
     this.scene.add(this._heroPlane);
   }
 
-  _buildBackdrop() {
-    // Flat pure-black scene background — the diamond's texture comes from
-    // its own material + the env map (used for both reflection AND
-    // transmission fallback), not from anything visible behind it.
-    return new THREE.Color(0x000000);
+  // ── Fluid gradient backdrop ────────────────────────────────────
+  // Ping-pong fluid simulation at half-viewport-res, dispatched every
+  // frame BEFORE the composer renders the diamond scene. The display
+  // pass output is written into a persistent render target whose
+  // texture is set as scene.background — so the diamond's transmission
+  // refracts a live black + blue gradient that flows on its own and
+  // reacts to the cursor.
+  _initFluid() {
+    const w = Math.max(2, Math.floor(window.innerWidth  * FLUID_RES_SCALE));
+    const h = Math.max(2, Math.floor(window.innerHeight * FLUID_RES_SCALE));
+
+    const rtOpts = {
+      minFilter:  THREE.LinearFilter,
+      magFilter:  THREE.LinearFilter,
+      format:     THREE.RGBAFormat,
+      type:       THREE.HalfFloatType,
+      depthBuffer: false,
+      stencilBuffer: false,
+    };
+    this._fluidTargetA  = new THREE.WebGLRenderTarget(w, h, rtOpts);
+    this._fluidTargetB  = new THREE.WebGLRenderTarget(w, h, rtOpts);
+    this._displayTarget = new THREE.WebGLRenderTarget(w, h, {
+      ...rtOpts,
+      type: THREE.UnsignedByteType,
+    });
+    this._fluidCurrent = this._fluidTargetA;
+    this._fluidPrev    = this._fluidTargetB;
+
+    this._fluidMat = new THREE.ShaderMaterial({
+      vertexShader:   FLUID_VERT,
+      fragmentShader: FLUID_FRAG,
+      uniforms: {
+        iTime:          { value: 0 },
+        iResolution:    { value: new THREE.Vector2(w, h) },
+        iMouse:         { value: new THREE.Vector4(0, 0, 0, 0) },
+        iFrame:         { value: 0 },
+        iPreviousFrame: { value: null },
+        uBrushSize:     { value: FLUID_BRUSH_SIZE },
+        uBrushStrength: { value: FLUID_BRUSH_STR },
+        uFluidDecay:    { value: FLUID_DECAY },
+        uTrailLength:   { value: FLUID_TRAIL },
+        uStopDecay:     { value: FLUID_STOP_DECAY },
+      },
+    });
+
+    this._displayMat = new THREE.ShaderMaterial({
+      vertexShader:   FLUID_VERT,
+      fragmentShader: FLUID_DISPLAY_FRAG,
+      uniforms: {
+        iTime:             { value: 0 },
+        iResolution:       { value: new THREE.Vector2(w, h) },
+        iFluid:            { value: null },
+        uDistortionAmount: { value: FLUID_DISTORTION },
+        uColor1:           { value: hexToVec3(FLUID_COLOR_1) },
+        uColor2:           { value: hexToVec3(FLUID_COLOR_2) },
+        uColor3:           { value: hexToVec3(FLUID_COLOR_3) },
+        uColor4:           { value: hexToVec3(FLUID_COLOR_4) },
+        uColorIntensity:   { value: FLUID_INTENSITY },
+        uSoftness:         { value: FLUID_SOFTNESS },
+      },
+    });
+
+    this._fluidQuadCam   = new THREE.Camera();
+    this._fluidQuadScene = new THREE.Scene();
+    this._fluidQuadMesh  = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this._fluidMat);
+    this._fluidQuadScene.add(this._fluidQuadMesh);
+
+    this._displayTarget.texture.colorSpace = THREE.SRGBColorSpace;
+  }
+
+  _stepFluid(elapsed) {
+    if (!this._fluidMat) return;
+
+    // Cursor input: if it's been quiet for >100ms, zero the input
+    if (performance.now() - this._lastMouseMoveMs > 100) {
+      this._fluidMat.uniforms.iMouse.value.set(0, 0, 0, 0);
+    }
+    this._fluidMat.uniforms.iTime.value          = elapsed;
+    this._fluidMat.uniforms.iFrame.value         = this._fluidFrame;
+    this._fluidMat.uniforms.iPreviousFrame.value = this._fluidPrev.texture;
+
+    // Fluid advection pass → current target
+    this._fluidQuadMesh.material = this._fluidMat;
+    this.renderer.setRenderTarget(this._fluidCurrent);
+    this.renderer.clear();
+    this.renderer.render(this._fluidQuadScene, this._fluidQuadCam);
+
+    // Display pass reads the fluid state, writes the colored gradient
+    this._displayMat.uniforms.iTime.value  = elapsed;
+    this._displayMat.uniforms.iFluid.value = this._fluidCurrent.texture;
+    this._fluidQuadMesh.material = this._displayMat;
+    this.renderer.setRenderTarget(this._displayTarget);
+    this.renderer.clear();
+    this.renderer.render(this._fluidQuadScene, this._fluidQuadCam);
+
+    this.renderer.setRenderTarget(null);
+
+    // Swap for next frame
+    const tmp = this._fluidCurrent;
+    this._fluidCurrent = this._fluidPrev;
+    this._fluidPrev    = tmp;
+    this._fluidFrame++;
   }
 
   _createDiamond() {
@@ -682,6 +982,19 @@ export class Philosophy {
     if (this.renderer)  this.renderer.setSize(w, h);
     if (this._composer) this._composer.setSize(w, h);
     if (this._bloom)    this._bloom.setSize(w, h);
+
+    // Fluid targets — re-size to the scaled sim resolution and reset frame
+    if (this._fluidTargetA && this._fluidTargetB && this._displayTarget) {
+      const fw = Math.max(2, Math.floor(w * FLUID_RES_SCALE));
+      const fh = Math.max(2, Math.floor(h * FLUID_RES_SCALE));
+      this._fluidTargetA.setSize(fw, fh);
+      this._fluidTargetB.setSize(fw, fh);
+      this._displayTarget.setSize(fw, fh);
+      this._fluidMat.uniforms.iResolution.value.set(fw, fh);
+      this._displayMat.uniforms.iResolution.value.set(fw, fh);
+      this._fluidFrame = 0;
+    }
+
     this._isMobile = w < 768 || "ontouchstart" in window;
   }
 
@@ -863,6 +1176,10 @@ export class Philosophy {
       this.diamond.rotation.x = tilt;
 
       this._elapsed += dt;
+
+      // Fluid simulation → display target — dispatched every frame BEFORE the
+      // composer so the diamond scene's background samples the fresh gradient.
+      this._stepFluid(this._elapsed);
 
       this._composer.render();
       this._rafId = requestAnimationFrame(tick);
