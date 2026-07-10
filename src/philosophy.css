@@ -68,14 +68,11 @@
   text-align: center;
 }
 
-/* Line reveal — clipped from bottom */
+/* Line hosts words that mask their chars — chars ride up on reveal.
+   .line stays visible so wrapped words show fully; overflow lives on .word. */
 .holm-philosophy__line {
-  overflow: hidden;
-  padding: 0.08em 0;
-}
-
-.holm-philosophy__line-inner {
-  display: block;
+  overflow: visible;
+  padding: 0.06em 0;
   font-family: var(--holm-display-font, 'Fraunces', serif);
   font-weight: 300;
   font-style: normal;
@@ -84,10 +81,22 @@
   letter-spacing: 0.004em;
   color: rgba(240, 246, 255, 0.96);
   text-shadow: 0 1px 30px rgba(0, 0, 0, 0.5);
+}
+
+.holm-philosophy__word {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.06em 0;
+  vertical-align: bottom;
+  will-change: transform;
+}
+
+.holm-philosophy__char {
+  display: inline-block;
   will-change: transform, opacity;
 }
 
-.holm-philosophy__beat[data-final="true"] .holm-philosophy__line-inner {
+.holm-philosophy__beat[data-final="true"] .holm-philosophy__line {
   font-size: clamp(1.9rem, 4vw, 3.2rem);
 }
 
@@ -146,22 +155,22 @@
     align-self: flex-end;
     text-align: center;
   }
-  .holm-philosophy__line-inner {
+  .holm-philosophy__line {
     font-size: clamp(1.3rem, 5.8vw, 1.9rem);
   }
-  .holm-philosophy__beat[data-final="true"] .holm-philosophy__line-inner {
+  .holm-philosophy__beat[data-final="true"] .holm-philosophy__line {
     font-size: clamp(1.55rem, 7vw, 2.2rem);
   }
 }
 
 /* ─── Reduced motion — center diamond, fade blocks in ──────────── */
-.holm-philosophy.is-reduced-motion .holm-philosophy__line { overflow: visible; }
-.holm-philosophy.is-reduced-motion .holm-philosophy__line-inner {
+.holm-philosophy.is-reduced-motion .holm-philosophy__word { overflow: visible; }
+.holm-philosophy.is-reduced-motion .holm-philosophy__char {
   opacity: 0;
   transform: none;
   transition: opacity 1s ease;
 }
-.holm-philosophy.is-reduced-motion .holm-philosophy__beat.is-in .holm-philosophy__line-inner {
+.holm-philosophy.is-reduced-motion .holm-philosophy__beat.is-in .holm-philosophy__char {
   opacity: 1;
 }
 .holm-philosophy.is-reduced-motion .holm-philosophy__stanza,

@@ -230,6 +230,22 @@ const MANIFESTO = [
   ["Ready to create your moment."],
 ];
 
+// Split a stanza line into per-word masks + per-char spans, so the reveal
+// can stagger characters upward without breaking natural word wrap.
+function splitLineToChars(text) {
+  return text.split(" ").map((word) => {
+    if (!word) return "";
+    const chars = Array.from(word).map((ch) => {
+      const safe = ch
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;");
+      return `<span class="holm-philosophy__char">${safe}</span>`;
+    }).join("");
+    return `<span class="holm-philosophy__word">${chars}</span>`;
+  }).join(" ");
+}
+
 // Closing CTA — appended after the last stanza inside the final beat
 const CTA_LABEL = "Let's talk";
 const CTA_HREF  = "/contact/";
@@ -369,9 +385,7 @@ export class Philosophy {
         const isFinal = textCounter === MANIFESTO.length - 1;
         textCounter++;
         const stanzaLines = stanza.map(line => `
-          <div class="holm-philosophy__line">
-            <span class="holm-philosophy__line-inner">${line}</span>
-          </div>
+          <div class="holm-philosophy__line">${splitLineToChars(line)}</div>
         `).join("");
         const ctaHtml = isFinal ? `
           <a class="holm-philosophy__cta"
@@ -417,8 +431,8 @@ export class Philosophy {
     });
 
     if (!this._reducedMotion) {
-      const allLines = container.querySelectorAll(".holm-philosophy__line-inner");
-      gsap.set(allLines, { yPercent: 108, opacity: 0 });
+      const allChars = container.querySelectorAll(".holm-philosophy__char");
+      gsap.set(allChars, { yPercent: 115, opacity: 0 });
     }
   }
 
@@ -685,18 +699,20 @@ export class Philosophy {
           if (cta) gsap.set(cta, { opacity: 1 });
           return;
         }
-        const lines = e.target.querySelectorAll(".holm-philosophy__line-inner");
-        gsap.to(lines, {
+        // Per-char stagger reveal — chars ride up from below their word-mask
+        const chars = e.target.querySelectorAll(".holm-philosophy__char");
+        gsap.to(chars, {
           yPercent: 0,
           opacity:  1,
-          duration: 1.15,
-          stagger:  0.14,
+          duration: 0.85,
+          stagger:  0.018,      // tight cascade — reads as fluid motion
           ease:     "power3.out",
         });
         if (cta) {
+          const ctaDelay = chars.length * 0.018 + 0.15;
           gsap.fromTo(cta,
             { opacity: 0, scale: 0.85 },
-            { opacity: 1, scale: 1, duration: 0.9, delay: 0.55, ease: "power3.out" },
+            { opacity: 1, scale: 1, duration: 0.9, delay: ctaDelay, ease: "power3.out" },
           );
         }
       });
