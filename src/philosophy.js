@@ -20,12 +20,12 @@ const FLUID_DECAY       = 0.985;
 const FLUID_TRAIL       = 0.90;
 const FLUID_STOP_DECAY  = 0.92;
 const FLUID_DISTORTION  = 1.6;
-const FLUID_INTENSITY   = 0.85;
+const FLUID_INTENSITY   = 0.72;
 const FLUID_SOFTNESS    = 1.4;
 const FLUID_COLOR_1     = "#000000";
-const FLUID_COLOR_2     = "#050d24";
-const FLUID_COLOR_3     = "#0e3277";
-const FLUID_COLOR_4     = "#3672d6";
+const FLUID_COLOR_2     = "#02040c";
+const FLUID_COLOR_3     = "#06183a";
+const FLUID_COLOR_4     = "#123063";
 
 // ─── Fluid shaders (adapted from an interactive-gradient reference) ──
 const FLUID_VERT = /* glsl */`
@@ -463,6 +463,7 @@ export class Philosophy {
     this._mouseWorld       = new THREE.Vector3();
     this._mouseWorldSmooth = new THREE.Vector3(999, 999, 999);
     this._invMat           = new THREE.Matrix4();
+    this._pointerActive    = false;   // set once the pointer has moved
 
     // Elapsed time driven off dt so we're timeline-consistent
     this._elapsed = 0;
@@ -509,6 +510,7 @@ export class Philosophy {
       (e.clientX / window.innerWidth) * 2 - 1,
       -((e.clientY / window.innerHeight) * 2 - 1),
     );
+    this._pointerActive = true;
     // Fluid input is in the fluid-sim texel space (half-viewport res, y-up)
     if (this._fluidMat) {
       const w = window.innerWidth,  h = window.innerHeight;
@@ -544,7 +546,7 @@ export class Philosophy {
     }
     if (this._heroPlane) {
       this._heroPlane.geometry.dispose();
-      this._heroPlane.material.map?.dispose();
+      this._heroPlane.material.uniforms?.uTextMap?.value?.dispose();
       this._heroPlane.material.dispose();
     }
     if (this.envMap) this.envMap.dispose();
@@ -704,8 +706,10 @@ export class Philosophy {
     cv.height = 640;
     const ctx = cv.getContext("2d");
 
-    // Canvas defaults to fully transparent — only draw the text, no rectangle
-    ctx.fillStyle = "rgba(224, 236, 255, 0.28)";
+    // Canvas defaults to fully transparent — draw as pure white; the
+    // shader tints it. Higher alpha because the shader now controls
+    // final opacity (was baked into the canvas before).
+    ctx.fillStyle = "rgba(255, 255, 255, 1.0)";
     ctx.font = "italic 300 480px 'Fraunces', 'Times New Roman', serif";
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
@@ -717,11 +721,90 @@ export class Philosophy {
     tex.magFilter  = THREE.LinearFilter;
     tex.anisotropy = this.renderer.capabilities.getMaxAnisotropy();
 
-    const mat = new THREE.MeshBasicMaterial({
-      map:         tex,
+    // Shader material — the watermark rides the same fluid as the backdrop:
+    //   • fluid velocity distorts the text UVs (letters ripple with the flow)
+    //   • a traveling sine adds an ambient wobble even when fluid is calm
+    //   • the cursor emits a radial ring that warps nearby letters
+    //   • chromatic aberration splits R/B channels along the flow, so
+    //     glyphs read as light refracting through liquid
+    const mat = new THREE.ShaderMaterial({
+      vertexShader: /* glsl */`
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform sampler2D uTextMap;
+        uniform sampler2D uFluidMap;
+        uniform float     uTime;
+        uniform vec2      uMouseUv;
+        uniform float     uCursorFocus;
+        uniform float     uOpacity;
+        varying vec2 vUv;
+
+        void main() {
+          vec2 uv = vUv;
+
+          // Fluid velocity as a base flow field distorting the letters
+          vec4 fluid   = texture2D(uFluidMap, uv);
+          vec2 flow    = fluid.xy;
+          float flowMag = length(flow);
+
+          // Ambient traveling wave — two sines running in orthogonal
+          // directions so the whole word slowly breathes
+          vec2 wave = vec2(
+            sin(uv.y * 26.0 + uTime * 1.15) * 0.010,
+            sin(uv.x * 18.0 - uTime * 0.85) * 0.007
+          );
+
+          // Cursor ring — radial ripple emanating from the pointer
+          vec2 fromCursor = uv - uMouseUv;
+          fromCursor.x *= 4.0;   // watermark is ~4:1, unwarp for round rings
+          float cd = length(fromCursor);
+          vec2 ripple = vec2(0.0);
+          float cursorMask = 0.0;
+          if (uCursorFocus > 0.001) {
+            float ringPhase = cd * 34.0 - uTime * 3.6;
+            float ringFall  = exp(-cd * 3.4);
+            vec2  dir       = fromCursor / max(cd, 1e-4);
+            ripple    = dir * sin(ringPhase) * ringFall * 0.020 * uCursorFocus;
+            cursorMask = smoothstep(0.55, 0.0, cd) * uCursorFocus;
+          }
+
+          vec2 distorted = uv + wave + flow * 0.14 + ripple;
+
+          // Chromatic aberration — grows with fluid velocity + near cursor
+          float ab  = 0.0025 + flowMag * 0.055 + cursorMask * 0.014;
+          float aR  = texture2D(uTextMap, distorted + vec2( ab, 0.0)).a;
+          float aG  = texture2D(uTextMap, distorted).a;
+          float aB  = texture2D(uTextMap, distorted - vec2( ab, 0.0)).a;
+
+          // Pure white watermark; cursor bleeds a whisper of warmth in
+          vec3 cool = vec3(1.00, 1.00, 1.00);
+          vec3 warm = vec3(1.00, 0.96, 0.90);
+          vec3 tint = mix(cool, warm, cursorMask * 0.85);
+
+          vec3 col   = tint * vec3(aR, aG, aB);
+          float alpha = max(max(aR, aG), aB);
+
+          alpha *= 0.90 + cursorMask * 0.10;
+          alpha *= uOpacity;
+
+          gl_FragColor = vec4(col, alpha);
+        }
+      `,
+      uniforms: {
+        uTextMap:     { value: tex },
+        uFluidMap:    { value: this._displayTarget.texture },
+        uTime:        { value: 0 },
+        uMouseUv:     { value: new THREE.Vector2(-2, -2) },
+        uCursorFocus: { value: 0 },
+        uOpacity:     { value: 1 },
+      },
       transparent: true,
       depthWrite:  false,
-      opacity:     1.0,
     });
 
     // Size the plane to comfortably fill the visible area at its depth.
@@ -734,10 +817,16 @@ export class Philosophy {
     const width   = Math.max(halfW * 2 * 1.15, 20);
     const height  = width / (cv.width / cv.height);
 
-    const geo = new THREE.PlaneGeometry(width, height);
+    // Higher subdivision so the traveling wave and cursor ring look smooth
+    const geo = new THREE.PlaneGeometry(width, height, 96, 24);
     this._heroPlane = new THREE.Mesh(geo, mat);
     this._heroPlane.position.z = HERO_Z;
     this._heroPlane.renderOrder = -1;
+    // Store what the render-loop needs to map the cursor onto the plane
+    this._heroPlaneSize  = { w: width, h: height, z: HERO_Z };
+    this._heroPlaneMath  = new THREE.Plane(new THREE.Vector3(0, 0, 1), -HERO_Z);
+    this._heroRaycaster  = new THREE.Raycaster();
+    this._heroHitPoint   = new THREE.Vector3();
     this.scene.add(this._heroPlane);
   }
 
@@ -1159,12 +1248,35 @@ export class Philosophy {
       this.diamond.scale.setScalar(curS);
 
       // Hero watermark plane — visible on the intro, fades as the user
-      // scrolls into the manifesto so it doesn't compete with the stanzas
+      // scrolls into the manifesto so it doesn't compete with the stanzas.
+      // Shader uniforms are driven every frame so the text rides the same
+      // fluid as the backdrop and reacts to the cursor.
       if (this._heroPlane) {
         const introFade = Math.max(0, 1 - this._scrollT * 4.0);
         const eased     = introFade * introFade * (3 - 2 * introFade);
-        this._heroPlane.material.opacity = eased;
+        const u         = this._heroPlane.material.uniforms;
+        u.uOpacity.value = eased;
+        u.uTime.value    = this._elapsed;
         this._heroPlane.visible = eased > 0.005;
+
+        // Project the cursor onto the watermark plane, convert to its
+        // local UV, and hand to the shader.
+        if (this._heroPlane.visible && this._pointerActive) {
+          this._heroRaycaster.setFromCamera(this._mouseNdc, this.camera);
+          const hit = this._heroRaycaster.ray.intersectPlane(
+            this._heroPlaneMath, this._heroHitPoint,
+          );
+          if (hit) {
+            const { w, h } = this._heroPlaneSize;
+            const uu = (hit.x + w * 0.5) / w;
+            const vv = 1 - (hit.y + h * 0.5) / h;
+            u.uMouseUv.value.set(uu, vv);
+            // Focus follows the intro fade — ripple dies as the watermark does
+            u.uCursorFocus.value = eased;
+          }
+        } else {
+          u.uCursorFocus.value = 0;
+        }
       }
 
       // Rotation — idle spin + slight tilt driven by scroll
