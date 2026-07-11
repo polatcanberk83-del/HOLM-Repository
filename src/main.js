@@ -8,6 +8,7 @@ import { loadModel, setLoadingManager } from "./three/loader.js";
 import { Loader }                       from "./loader.js";
 import { Menu }                         from "./menu.js";
 import { initHoverRoll }                from "./hoverRoll.js";
+import { mountPageTransition, signalPageReady } from "./pageTransition.js";
 import {
   createShatterEffect,
   SHATTER_T_ENTER,
@@ -321,17 +322,25 @@ gsap.ticker.lagSmoothing(0);
 // Wrap every [data-hover-roll] target with the two-line stagger effect
 initHoverRoll(document);
 
-// Dev-only room-guide menu — production ships with the "Book a call" button
-// visible instead. On localhost we mount the menu and hide book-a-call so
-// dev navigation to other pages still works.
-if (import.meta.env.DEV) {
-  const menu = new Menu({ lenis });
-  menu.mount();
-  // Re-scan for [data-hover-roll] targets now that the menu DOM exists
-  initHoverRoll(document);
-  const bookCall = document.getElementById("book-call");
-  if (bookCall) bookCall.style.display = "none";
-}
+// Read the transition flag BEFORE mounting the transition — mount()
+// consumes (removes) the flag when it enters "pending reveal" mode,
+// so boot() below wouldn't see it otherwise.
+const arrivedViaTransition = (() => {
+  try { return sessionStorage.getItem("holm:transition") === "1"; }
+  catch (_) { return false; }
+})();
+
+// Site-wide page transition — grid shutter cover-and-hold on nav
+mountPageTransition();
+
+// Room-guide menu — always mounted; book-a-call is hidden while the menu
+// takes the corner slot. Every page is shipped publicly now.
+const menu = new Menu({ lenis });
+menu.mount();
+// Re-scan for [data-hover-roll] targets now that the menu DOM exists
+initHoverRoll(document);
+const bookCall = document.getElementById("book-call");
+if (bookCall) bookCall.style.display = "none";
 
 lenis.on("scroll", ({ scroll, limit }) => {
   splineT = limit > 0 ? scroll / limit : 0;
@@ -447,56 +456,73 @@ async function boot() {
   _lookNow.set(0, 1.5, MODEL_DEFS[0].z);
   camera.lookAt(_lookNow);
 
+  // arrivedViaTransition is captured at module load (before mount
+  // consumes the sessionStorage flag). If it's true, the block cover
+  // is already holding the screen — Loader visuals would double up.
+
   // Cinematic preloader — diamond + counter → iris reveal
   // Camera dolly + caption fade fire at reveal-start so they play DURING
   // the iris opening (not after), producing a continuous transition
   // rather than "iris then jump-to-settled-scene".
   let mainTickStarted = false;
-  const loader = new Loader({
-    renderer,
-    onReveal: () => {
-      if (mainTickStarted) return;
-      mainTickStarted = true;
-      requestAnimationFrame(tick);
+  const onSceneReveal = () => {
+    if (mainTickStarted) return;
+    mainTickStarted = true;
+    requestAnimationFrame(tick);
 
-      // Scene wakes up slowly — 4.2s ramp so lights are still climbing after
-      // the iris is fully open (~2.2s). Prevents "iris then bright scene" jump.
-      const rev = { v: 0 };
-      gsap.to(rev, {
-        v: 1,
-        duration: 4.2,
-        ease: "power2.out",
-        onUpdate: () => { _revealF = rev.v; },
-      });
+    // Scene wakes up slowly — 4.2s ramp so lights are still climbing after
+    // the iris is fully open (~2.2s). Prevents "iris then bright scene" jump.
+    const rev = { v: 0 };
+    gsap.to(rev, {
+      v: 1,
+      duration: 4.2,
+      ease: "power2.out",
+      onUpdate: () => { _revealF = rev.v; },
+    });
 
-      gsap.to(camera.position, {
-        z: p0.z,
-        duration: 3.8,
-        ease: "power2.out",
-      });
-      gsap.to(captionEl, {
-        opacity: 1,
-        duration: 1.4,
-        delay: 2.4,
-        ease: "power2.out",
-      });
-    },
-  });
+    gsap.to(camera.position, {
+      z: p0.z,
+      duration: 3.8,
+      ease: "power2.out",
+    });
+    gsap.to(captionEl, {
+      opacity: 1,
+      duration: 1.4,
+      delay: 2.4,
+      ease: "power2.out",
+    });
+  };
 
-  // Route GLTF progress into loader's UI counter
-  setLoadingManager(loader.getLoadingManager());
+  if (arrivedViaTransition) {
+    // No preloader visuals — hand GLTF progress to a bare THREE
+    // loading manager so models still load. Reveal fires the moment
+    // resources are ready.
+    setLoadingManager(new THREE.LoadingManager());
+    for (let i = 0; i < MODEL_DEFS.length; i++) {
+      await loadOneModel(MODEL_DEFS[i], i);
+    }
+    if (!isMobile) createDustParticles();
+    onSceneReveal();
+    // Tell the page transition the scene is ready — block cover fades out
+    signalPageReady();
+  } else {
+    const loader = new Loader({ renderer, onReveal: onSceneReveal });
 
-  // Kick off loader visuals + phase gates; models load in parallel below
-  const loaderPromise = loader.run();
+    // Route GLTF progress into loader's UI counter
+    setLoadingManager(loader.getLoadingManager());
 
-  for (let i = 0; i < MODEL_DEFS.length; i++) {
-    await loadOneModel(MODEL_DEFS[i], i);
+    // Kick off loader visuals + phase gates; models load in parallel below
+    const loaderPromise = loader.run();
+
+    for (let i = 0; i < MODEL_DEFS.length; i++) {
+      await loadOneModel(MODEL_DEFS[i], i);
+    }
+
+    if (!isMobile) createDustParticles();
+
+    loader.markComplete();
+    await loaderPromise;
   }
-
-  if (!isMobile) createDustParticles();
-
-  loader.markComplete();
-  await loaderPromise;
 
   // CTA button magnetic hover
   const ctaBtn = document.querySelector(".proj-cta");

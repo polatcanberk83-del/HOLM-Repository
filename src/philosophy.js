@@ -781,15 +781,16 @@ export class Philosophy {
           float aG  = texture2D(uTextMap, distorted).a;
           float aB  = texture2D(uTextMap, distorted - vec2( ab, 0.0)).a;
 
-          // Pure white watermark; cursor bleeds a whisper of warmth in
-          vec3 cool = vec3(1.00, 1.00, 1.00);
-          vec3 warm = vec3(1.00, 0.96, 0.90);
+          // Base tint — pure black; cursor bleeds a whisper of warmth in
+          vec3 cool = vec3(0.00, 0.00, 0.00);
+          vec3 warm = vec3(0.06, 0.04, 0.03);
           vec3 tint = mix(cool, warm, cursorMask * 0.85);
 
           vec3 col   = tint * vec3(aR, aG, aB);
           float alpha = max(max(aR, aG), aB);
 
-          alpha *= 0.90 + cursorMask * 0.10;
+          // Black watermark needs more presence to read against the fluid
+          alpha *= 0.72 + cursorMask * 0.28;
           alpha *= uOpacity;
 
           gl_FragColor = vec4(col, alpha);
