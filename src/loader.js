@@ -376,7 +376,7 @@ export class Loader {
         ? 7.4
         : aspect < 1.0
           ? 5.8
-          : 4.7;
+          : 6.2;
       this.camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", this._resize);
