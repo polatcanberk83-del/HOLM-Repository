@@ -51,6 +51,20 @@ jobs:
           name: build-log
           path: build.log
 
+      - name: Publish build.log to ci-log branch on failure
+        if: failure()
+        run: |
+          git config user.name  "ci-log-bot"
+          git config user.email "ci@holm"
+          BR=ci-log-$(date +%s)
+          git checkout --orphan "$BR"
+          git rm -rf --cached . || true
+          git clean -fdx -e build.log -e .git
+          git add build.log
+          git commit -m "ci: build.log for ${{ github.sha }}"
+          git push origin "$BR"
+          echo "Log pushed to branch $BR"
+
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
         with:
