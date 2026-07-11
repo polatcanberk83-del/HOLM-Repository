@@ -140,7 +140,10 @@ void main() {
 
       <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true"></section>
 
-      <main class="holm-philosophy__beats">
+      <main id="philosophy-content"
+            class="holm-philosophy__beats"
+            tabindex="-1"
+            aria-label="HOLM philosophy — six-part manifesto">
         ${K.map((e,n)=>{if(!e.hasText)return``;let r=J[t],i=t===J.length-1;t++;let a=r.map(e=>`
           <div class="holm-philosophy__line">${Se(e)}</div>
         `).join(``),o=i?`
