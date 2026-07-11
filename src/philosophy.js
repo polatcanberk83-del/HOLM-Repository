@@ -1284,9 +1284,11 @@ export class Philosophy {
       const halfH   = Math.tan(halfFov) * depth;
       const halfW   = halfH * this.camera.aspect;
 
-      // On very narrow screens, collapse horizontal offset — text goes above/below
+      // Mobile: keep full horizontal motion so the diamond visually
+      // opposes the stanza's side (same rhythm as desktop). The diamond
+      // is shrunk aggressively below so there's room for both on one row.
       const narrow  = this._isMobile;
-      const wx      = narrow ? target.x * 0.2 : target.x;
+      const wx      = target.x;
       const wy      = target.y;
 
       this._targetPos.set(wx * halfW, wy * halfH, 0);
@@ -1295,11 +1297,11 @@ export class Philosophy {
       const k = 1 - Math.pow(1 - POS_LERP, dt * 60);
       this.diamond.position.lerp(this._targetPos, k);
 
-      // Mobile: shrink the diamond so it stays a "jewel" on screen and
-      // doesn't overwhelm the stanza sitting below it. 0.62 hits the
-      // sweet spot at all beats (biggest beat scale 1.35 × 0.62 ≈ 0.84,
-      // smallest 0.62 × 0.62 ≈ 0.38 — still readable as a diamond).
-      const scaleTarget = narrow ? target.scale * 0.62 : target.scale;
+      // Mobile: much smaller diamond (0.42×) so it reads as a jewel on the
+      // opposite side of the stanza instead of stealing the row. Biggest
+      // beat 1.35 × 0.42 ≈ 0.57 world diameter — comfortably fits a
+      // ~40vw column beside a ~55vw text column on a phone.
+      const scaleTarget = narrow ? target.scale * 0.42 : target.scale;
       const curS = this.diamond.scale.x + (scaleTarget - this.diamond.scale.x) * k;
       this.diamond.scale.setScalar(curS);
 

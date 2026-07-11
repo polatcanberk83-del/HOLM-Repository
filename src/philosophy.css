@@ -160,16 +160,31 @@
   }
 }
 
-/* ─── Mobile / narrow: collapse side layout, stack diamond + text ── */
+/* ─── Mobile / narrow: keep side layout so text opposes the diamond ──
+   The diamond is shrunk in JS to ~0.42× on mobile, giving each stanza a
+   ~55vw column on its side of the frame. Narrower max-width and reduced
+   padding compared to desktop, but the L/R rhythm survives. */
 @media (max-width: 767px) {
   .holm-philosophy__beat {
-    padding: 0 6vw;
-    padding-left:  max(6vw, env(safe-area-inset-left));
-    padding-right: max(6vw, env(safe-area-inset-right));
+    padding: 0 5vw;
+    padding-left:  max(5vw, env(safe-area-inset-left));
+    padding-right: max(5vw, env(safe-area-inset-right));
+    align-items: center;
   }
   .holm-philosophy__stanza,
-  .holm-philosophy__beat[data-side="left"]  .holm-philosophy__stanza,
-  .holm-philosophy__beat[data-side="right"] .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="left"]  .holm-philosophy__stanza {
+    max-width: 55%;
+    margin: auto auto auto 0;
+    align-self: center;
+    text-align: left;
+  }
+  .holm-philosophy__beat[data-side="right"] .holm-philosophy__stanza {
+    max-width: 55%;
+    margin: auto 0 auto auto;
+    align-self: center;
+    text-align: right;
+  }
+  /* "below" and "center-below" beats center the text under the diamond */
   .holm-philosophy__beat[data-side="below"] .holm-philosophy__stanza,
   .holm-philosophy__beat[data-side="center-below"] .holm-philosophy__stanza {
     max-width: 88%;
@@ -178,10 +193,11 @@
     text-align: center;
   }
   .holm-philosophy__line {
-    font-size: clamp(1.3rem, 5.8vw, 1.9rem);
+    font-size: clamp(1.1rem, 4.8vw, 1.65rem);
+    line-height: 1.24;
   }
   .holm-philosophy__beat[data-final="true"] .holm-philosophy__line {
-    font-size: clamp(1.55rem, 7vw, 2.2rem);
+    font-size: clamp(1.4rem, 6vw, 2rem);
   }
   .holm-philosophy__cta {
     margin: 2.4rem auto 0;
