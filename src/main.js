@@ -491,6 +491,42 @@ async function boot() {
       delay: 2.4,
       ease: "power2.out",
     });
+
+    // Landing teaser — 2-line "what is HOLM" that appears in the first
+    // few seconds after iris reveal so a visitor who doesn't scroll still
+    // learns what this site is. Fades out once they start scrolling OR
+    // after a 7s dwell, whichever comes first.
+    const teaser = document.getElementById("holm-teaser");
+    if (teaser) {
+      teaser.setAttribute("aria-hidden", "false");
+      gsap.fromTo(teaser,
+        { opacity: 0, y: 12 },
+        {
+          opacity: 1, y: 0,
+          duration: 1.2, delay: 1.6,
+          ease: "power2.out",
+        },
+      );
+
+      const hideTeaser = () => {
+        gsap.to(teaser, {
+          opacity: 0,
+          duration: 0.8,
+          ease: "power2.out",
+          onComplete: () => teaser.setAttribute("aria-hidden", "true"),
+        });
+        window.removeEventListener("wheel",     onScrollHide, { passive: true });
+        window.removeEventListener("touchmove", onScrollHide, { passive: true });
+        clearTimeout(dwellTimer);
+      };
+      const onScrollHide = () => {
+        // Ignore taps and jitter — only real scroll intent hides the teaser
+        if (window.scrollY > 20) hideTeaser();
+      };
+      const dwellTimer = setTimeout(hideTeaser, 7000);
+      window.addEventListener("wheel",     onScrollHide, { passive: true });
+      window.addEventListener("touchmove", onScrollHide, { passive: true });
+    }
   };
 
   if (arrivedViaTransition) {

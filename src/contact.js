@@ -125,7 +125,10 @@ export class Contact {
       <a class="holm-contact__brand" href="/" aria-label="HOLM — home">
         <img src="${logoUrl}" alt="HOLM" />
       </a>
-      <main class="holm-contact__stage">
+      <main id="contact-content"
+            class="holm-contact__stage"
+            tabindex="-1"
+            aria-label="HOLM contact">
         <div class="holm-contact__logo-anchor" aria-hidden="true"></div>
         <nav class="holm-contact__links" aria-label="Contact">
           ${LINKS.map(orb).join("")}

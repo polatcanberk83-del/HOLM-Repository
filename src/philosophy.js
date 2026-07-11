@@ -621,7 +621,10 @@ export class Philosophy {
 
       <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true"></section>
 
-      <main class="holm-philosophy__beats">
+      <main id="philosophy-content"
+            class="holm-philosophy__beats"
+            tabindex="-1"
+            aria-label="HOLM philosophy — six-part manifesto">
         ${beatsHtml}
       </main>
     `;

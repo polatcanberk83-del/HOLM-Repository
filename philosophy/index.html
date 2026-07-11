@@ -35,9 +35,37 @@
       body {
         min-height: 100vh;
       }
+
+      .holm-skip {
+        position: fixed;
+        top: 8px; left: 8px;
+        z-index: 1200;
+        padding: 10px 16px;
+        background: #ffffff;
+        color: #0a0a12;
+        font-family: 'Fraunces', serif;
+        font-size: 0.85rem;
+        letter-spacing: 0.06em;
+        text-decoration: none;
+        border-radius: 2px;
+        transform: translateY(-140%);
+        transition: transform 0.24s ease;
+      }
+      .holm-skip:focus-visible {
+        transform: translateY(0);
+        outline: 2px solid rgba(120, 180, 255, 0.9);
+        outline-offset: 2px;
+      }
+      :focus { outline: none; }
+      a:focus-visible, button:focus-visible {
+        outline: 2px solid rgba(255, 255, 255, 0.85);
+        outline-offset: 3px;
+        border-radius: 2px;
+      }
     </style>
   </head>
   <body>
+    <a class="holm-skip" href="#philosophy-content">Skip to content</a>
     <script type="module" src="/src/philosophy-entry.js"></script>
   </body>
 </html>
