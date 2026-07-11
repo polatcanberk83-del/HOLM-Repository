@@ -1,9 +1,10 @@
 import Lenis from "lenis";
 import gsap  from "gsap";
 
-import { Menu }           from "./menu.js";
-import { Philosophy }     from "./philosophy.js";
-import { initHoverRoll }  from "./hoverRoll.js";
+import { Menu }                                    from "./menu.js";
+import { Philosophy }                              from "./philosophy.js";
+import { initHoverRoll }                           from "./hoverRoll.js";
+import { mountPageTransition, signalPageReady }    from "./pageTransition.js";
 
 // ─── Lenis ───────────────────────────────────────────────────────────
 const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
@@ -36,6 +37,13 @@ philosophy.init();
 
 // Wrap [data-hover-roll] targets (the menu's CTA + philosophy's Let's talk)
 initHoverRoll(document);
+
+// Site-wide page transition — cover-and-hold across navigations
+mountPageTransition();
+
+window.addEventListener("load", () => {
+  setTimeout(signalPageReady, 200);
+});
 
 // Clean up if the tab is torn down / hot-reloaded
 window.addEventListener("pagehide", () => {

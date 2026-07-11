@@ -3,9 +3,12 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HOLM — Philosophy</title>
+    <title>HOLM — Contact</title>
 
     <script>
+      // Sync flash-preventer — if we arrived via a page transition,
+      // paint the page dark from the very first frame so the block
+      // cover reads as continuous with the previous page's cover.
       try {
         if (sessionStorage.getItem("holm:transition") === "1") {
           document.documentElement.classList.add("holm-entering");
@@ -32,12 +35,10 @@
         overflow-x: hidden;
         overscroll-behavior-y: none;
       }
-      body {
-        min-height: 100vh;
-      }
+      body { min-height: 100vh; }
     </style>
   </head>
   <body>
-    <script type="module" src="/src/philosophy-entry.js"></script>
+    <script type="module" src="/src/contact-entry.js"></script>
   </body>
 </html>

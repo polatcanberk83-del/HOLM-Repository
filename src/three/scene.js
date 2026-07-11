@@ -35,75 +35,11 @@ export function createScene(canvas, isMobile = false) {
   // Bloom eşiği (threshold=0.9, exposure=6.5): mavi kanal 0x1c (0.11 linear)
   // × WALL_EMISSIVE × 6.5 ≈ 0.43 — eşiğin çok altında, bloom şişirmez.
   // İnce ayar: bu tek değeri değiştir.
+  // Duvarlar — düz, çok koyu gri. Ton buradan ayarlanır.
   const wallUniforms = { uTime: { value: 0 } };
-
-  // Tamamen custom ShaderMaterial — MeshStandardMaterial injection yerine
-  // domain-warped 5-oktav FBM, derinlik karartması, kenar vignette
-  const roomMat = new THREE.ShaderMaterial({
-    uniforms: wallUniforms,
-    side: THREE.BackSide,
-    vertexShader: /* glsl */`
-      varying vec3 vWorldPos;
-      void main() {
-        vWorldPos   = (modelMatrix * vec4(position, 1.0)).xyz;
-        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-      }
-    `,
-    fragmentShader: /* glsl */`
-      precision highp float;
-      uniform float uTime;
-      varying vec3  vWorldPos;
-
-      float hash(vec2 p) {
-        p = fract(p * vec2(234.34, 435.35));
-        p += dot(p, p + 34.23);
-        return fract(p.x * p.y);
-      }
-      float noise(vec2 p) {
-        vec2 i = floor(p), f = fract(p);
-        f = f * f * (3.0 - 2.0 * f);
-        return mix(mix(hash(i), hash(i+vec2(1,0)), f.x),
-                   mix(hash(i+vec2(0,1)), hash(i+vec2(1,1)), f.x), f.y);
-      }
-      float fbm(vec2 p) {
-        float v = 0.0, a = 0.5;
-        for (int i = 0; i < 5; i++) { v += a * noise(p); p = p * 2.3 + vec2(1.7, 0.9); a *= 0.45; }
-        return v;
-      }
-
-      void main() {
-        float z = clamp((vWorldPos.z + 80.0) / 90.0, 0.0, 1.0); // 0=uzak, 1=yakın
-        float y = vWorldPos.y / 8.0;
-
-        // Domain-warped FBM: her katman bir öncekini bükuyor
-        float n1 = fbm(vec2(z * 2.5  - uTime * 0.08,  y * 1.5  + uTime * 0.05));
-        float n2 = fbm(vec2(z * 5.0  + uTime * 0.13  + n1 * 0.8, y * 3.0 - uTime * 0.09));
-        float n3 = fbm(vec2(z * 3.5  - uTime * 0.06  + n2 * 0.5, y * 2.0 + uTime * 0.07));
-        float g  = n1 * 0.50 + n2 * 0.30 + n3 * 0.20;
-
-        // Renk paleti: derin lacivert → elektrik mavi → indigo
-        vec3 c1  = vec3(0.018, 0.028, 0.10);
-        vec3 c2  = vec3(0.040, 0.100, 0.32);
-        vec3 c3  = vec3(0.080, 0.200, 0.52);
-        vec3 col = mix(c1, c2, smoothstep(0.0, 0.45, g));
-        col      = mix(col, c3, smoothstep(0.45, 0.85, g));
-        col      = mix(col, c2 * 0.7, smoothstep(0.75, 1.0, g) * n3);
-
-        // Koridor derinliği: uzaklaştıkça kararır
-        col *= (0.22 + z * 0.78);
-
-        // Üst/alt kenar karartması
-        col *= (0.35 + smoothstep(0.0, 0.20, y) * smoothstep(1.0, 0.80, y) * 0.65);
-
-        // Kir/grunge katmanı — statik yüksek frekanslı leke deseni
-        float dirt = fbm(vec2(vWorldPos.x * 5.5 + vWorldPos.z * 1.2, vWorldPos.y * 9.0));
-        float dirt2 = fbm(vec2(vWorldPos.z * 3.0 + dirt * 0.6, vWorldPos.x * 7.0 + vWorldPos.y * 4.0));
-        col *= (0.93 + dirt * 0.04 + dirt2 * 0.03);
-
-        col *= 5.2; // genel parlaklık — ince ayar buradan
-        gl_FragColor = vec4(col, 1.0);
-      }
-    `,
+  const roomMat = new THREE.MeshBasicMaterial({
+    color: 0x141418,   // ince ayar — çok koyu gri
+    side:  THREE.BackSide,
   });
   const room = new THREE.Mesh(new THREE.BoxGeometry(20, 8, 102), roomMat);
   room.position.set(0, 4, -39);
@@ -112,11 +48,11 @@ export function createScene(canvas, isMobile = false) {
 
   // Zemin — hafif yansımalı
   const floorMat = new THREE.MeshStandardMaterial({
-    color:             0x252530, // açık gri-mavi
+    color:             0x2b2b36, // açık gri-mavi (hafif yükseltildi)
     roughness:         0.85,
     metalness:         0.10,
-    emissive:          new THREE.Color(0x181820), // gri glow
-    emissiveIntensity: 10.0, // ince ayar buradan
+    emissive:          new THREE.Color(0x1c1c26), // gri glow (hafif yükseltildi)
+    emissiveIntensity: 12.5,     // ince ayar buradan
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), floorMat);
   floor.rotation.x = -Math.PI / 2;

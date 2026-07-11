@@ -5,6 +5,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>HOLM — Between sketch and masterpiece, there's patience</title>
 
+    <script>
+      try {
+        if (sessionStorage.getItem("holm:transition") === "1") {
+          document.documentElement.classList.add("holm-entering");
+        }
+      } catch (_) {}
+    </script>
+    <style>
+      html.holm-entering, html.holm-entering body { background: #000000 !important; }
+    </style>
+
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">

@@ -32,25 +32,32 @@
   padding: 0;
   border: none;
   background: transparent;
-  color: rgba(220, 232, 250, 0.9);
+  /* Set to white — mix-blend-mode: difference on the icon inverts it
+     against whatever is behind, so it reads as black on light pages
+     (contact) and white on dark ones (philosophy, home). */
+  color: #ffffff;
   cursor: pointer;
   pointer-events: auto;
   display: flex;
   align-items: center;
   justify-content: center;
   will-change: transform;
-  transition: color 0.3s ease;
   outline: none;
 }
-.holm-menu__trigger:hover  { color: rgba(240, 248, 255, 1.0); }
 .holm-menu__trigger:focus-visible {
-  outline: 1px solid rgba(220, 232, 250, 0.55);
+  outline: 1px solid rgba(128, 128, 128, 0.55);
   outline-offset: 6px;
 }
 
 .holm-menu__icon {
   display: block;
   overflow: visible;
+  mix-blend-mode: difference;
+}
+/* When the panel is open the dim overlay covers content — swap the
+   blend mode off so the icon reads cleanly against the dim. */
+.holm-menu__trigger[aria-expanded="true"] .holm-menu__icon {
+  mix-blend-mode: normal;
 }
 .holm-menu__diamond,
 .holm-menu__x1,
@@ -100,9 +107,10 @@
 }
 
 .holm-menu__link {
-  display: flex;
-  align-items: baseline;
-  gap: 14px;
+  display: grid;
+  grid-template-columns: 32px 1fr;
+  align-items: center;
+  column-gap: 16px;
   padding: 9px 0;
   color: rgba(220, 232, 250, 0.85);
   text-decoration: none;
@@ -121,8 +129,9 @@
   font-size: 0.6rem;
   letter-spacing: 0.18em;
   color: rgba(180, 200, 230, 0.5);
-  min-width: 22px;
   font-variant-numeric: tabular-nums;
+  text-align: left;
+  align-self: center;
 }
 
 .holm-menu__name {
