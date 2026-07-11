@@ -33,10 +33,23 @@ jobs:
           ls -la src || true
 
       - name: Build
-        run: npm run build --verbose 2>&1
+        id: build
+        run: |
+          set +e
+          npm run build > build.log 2>&1
+          EXIT=$?
+          echo "----- build.log -----"
+          cat build.log
+          exit $EXIT
         env:
-          # Change this to /your-repo-name/ if not using a custom domain
           VITE_BASE_PATH: /
+
+      - name: Upload build log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
 
       - name: Deploy to gh-pages branch
         uses: peaceiris/actions-gh-pages@v4
