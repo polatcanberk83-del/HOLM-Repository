@@ -22,8 +22,18 @@ jobs:
       - name: Install dependencies
         run: npm install
 
+      - name: Debug — list tracked src/assets and vite version
+        run: |
+          node --version
+          npm --version
+          npx vite --version
+          echo '--- src/assets ---'
+          ls -la src/assets || true
+          echo '--- src root ---'
+          ls -la src || true
+
       - name: Build
-        run: npm run build
+        run: npm run build --verbose 2>&1
         env:
           # Change this to /your-repo-name/ if not using a custom domain
           VITE_BASE_PATH: /
