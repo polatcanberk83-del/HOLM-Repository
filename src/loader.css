@@ -27,7 +27,7 @@
   align-items: baseline;
   gap: 0.12em;
   font-weight: 300;
-  font-style: italic;
+  font-style: normal;
   font-size: clamp(2.4rem, 6.8vw, 5.2rem);
   letter-spacing: 0.02em;
   line-height: 1;

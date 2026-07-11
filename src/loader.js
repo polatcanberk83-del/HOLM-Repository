@@ -6,6 +6,14 @@ import "./loader.css";
 const MIN_DURATION      = 3.0;                   // seconds — patience floor
 const OVERLAY_BG        = "#000000";
 
+// The main renderer is capped at DPR 1.0 on mobile for performance (heavy
+// shadows + post-processing). The loader is only visible for ~3s and draws
+// nothing but a wireframe diamond — well within budget to render at a
+// higher DPR. Bumping here fixes the "blurry line-art" issue on retina
+// phones without affecting main-scene perf, because we restore the
+// original ratio at the top of the iris reveal before main starts drawing.
+const LOADER_MOBILE_DPR = 2;
+
 const COLLAPSE_DURATION = 0.75;
 const COLLAPSE_EASE     = "power3.inOut";
 
@@ -177,6 +185,21 @@ export class Loader {
   }
 
   async run() {
+    // Bump renderer DPR for the loader phase — the main renderer was capped
+    // at 1.0 on mobile to keep the heavy museum scene playable, but the loader
+    // shows nothing but thin white lines, which alias badly at 1.0 on a 3×
+    // screen. Restored inside _runPhase3 before the main scene draws.
+    this._prevPixelRatio = this.renderer.getPixelRatio();
+    const targetDpr = Math.min(
+      window.devicePixelRatio,
+      window.innerWidth < 768 || "ontouchstart" in window ? LOADER_MOBILE_DPR : 2,
+    );
+    if (targetDpr > this._prevPixelRatio) {
+      this.renderer.setPixelRatio(targetDpr);
+      // false → don't touch the canvas CSS size, only the drawing buffer
+      this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+    }
+
     this._createDOM();
     this._createDiamond();
     this._bindLoadingManager();
@@ -250,6 +273,16 @@ export class Loader {
       // Stop loader RAF, hand canvas to main scene BEFORE the iris opens
       this._active = false;
       if (this._rafId) cancelAnimationFrame(this._rafId);
+
+      // Restore the renderer's pixel ratio to whatever main.js set up so the
+      // museum scene renders at its perf-tuned resolution. Do this BEFORE
+      // _onReveal() so the main scene's first frame draws at the right size.
+      if (this._prevPixelRatio != null
+          && this.renderer.getPixelRatio() !== this._prevPixelRatio) {
+        this.renderer.setPixelRatio(this._prevPixelRatio);
+        this.renderer.setSize(window.innerWidth, window.innerHeight, false);
+      }
+
       if (this._onReveal) this._onReveal();
 
       const overlay = this.overlay;
@@ -334,12 +367,16 @@ export class Loader {
       const w = window.innerWidth, h = window.innerHeight;
       const aspect = w / h;
       this.camera.aspect = aspect;
-      // Portrait: pull the camera back so the gem doesn't crop / overflow
+      // Portrait: pull the camera back so the gem doesn't crop / overflow.
+      // Extra pull-back on all breakpoints — the diamond used to fill too
+      // much of the frame; the counter reads better with more negative
+      // space around the gem. Phone gets the biggest bump (7.4) so the
+      // wireframe stays a jewel-sized accent, not a foreground element.
       this.camera.position.z = aspect < 0.75
-        ? 5.6
+        ? 7.4
         : aspect < 1.0
-          ? 4.6
-          : 3.9;
+          ? 5.8
+          : 4.7;
       this.camera.updateProjectionMatrix();
     };
     window.addEventListener("resize", this._resize);

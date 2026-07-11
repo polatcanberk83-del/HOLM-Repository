@@ -39,11 +39,13 @@
   display: flex;
   align-items: center;
   padding: 0 6vw;
+  padding-left:  max(6vw, env(safe-area-inset-left));
+  padding-right: max(6vw, env(safe-area-inset-right));
 }
 
 .holm-philosophy__stanza {
   position: relative;
-  max-width: 44%;
+  max-width: min(44%, 640px);
 }
 
 /* Text SIDE variants — opposite the diamond */
@@ -57,13 +59,13 @@
 }
 .holm-philosophy__beat[data-side="below"] .holm-philosophy__stanza {
   margin: auto auto 8vh;
-  max-width: 54%;
+  max-width: min(54%, 760px);
   align-self: flex-end;
   text-align: center;
 }
 .holm-philosophy__beat[data-side="center-below"] .holm-philosophy__stanza {
   margin: auto auto 12vh;
-  max-width: 62%;
+  max-width: min(62%, 820px);
   align-self: flex-end;
   text-align: center;
 }
@@ -140,10 +142,30 @@
     0 0 0 1px rgba(255, 255, 255, 0.10) inset;
 }
 
+/* ─── Tablet portrait — desktop side layout, wider stanza ─────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="left"]  .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side="right"] .holm-philosophy__stanza {
+    max-width: 52%;
+  }
+  .holm-philosophy__beat[data-side="below"] .holm-philosophy__stanza {
+    max-width: 68%;
+  }
+  .holm-philosophy__beat[data-side="center-below"] .holm-philosophy__stanza {
+    max-width: 74%;
+  }
+  .holm-philosophy__line {
+    font-size: clamp(1.5rem, 3vw, 2.3rem);
+  }
+}
+
 /* ─── Mobile / narrow: collapse side layout, stack diamond + text ── */
 @media (max-width: 767px) {
   .holm-philosophy__beat {
     padding: 0 6vw;
+    padding-left:  max(6vw, env(safe-area-inset-left));
+    padding-right: max(6vw, env(safe-area-inset-right));
   }
   .holm-philosophy__stanza,
   .holm-philosophy__beat[data-side="left"]  .holm-philosophy__stanza,
@@ -151,7 +173,7 @@
   .holm-philosophy__beat[data-side="below"] .holm-philosophy__stanza,
   .holm-philosophy__beat[data-side="center-below"] .holm-philosophy__stanza {
     max-width: 88%;
-    margin: auto auto 12vh;
+    margin: auto auto max(12vh, calc(6vh + env(safe-area-inset-bottom)));
     align-self: flex-end;
     text-align: center;
   }
@@ -160,6 +182,37 @@
   }
   .holm-philosophy__beat[data-final="true"] .holm-philosophy__line {
     font-size: clamp(1.55rem, 7vw, 2.2rem);
+  }
+  .holm-philosophy__cta {
+    margin: 2.4rem auto 0;
+    width: clamp(130px, 34vw, 168px);
+  }
+}
+
+/* ─── Landscape phone — beats shorter than 100vh would clip text ─ */
+@media (max-width: 900px) and (max-height: 500px) and (orientation: landscape) {
+  .holm-philosophy__beat {
+    min-height: 100vh;
+    align-items: flex-end;
+    padding: 4vh 6vw;
+  }
+  .holm-philosophy__stanza,
+  .holm-philosophy__beat[data-side] .holm-philosophy__stanza {
+    max-width: 78%;
+    margin: auto auto 4vh;
+    text-align: center;
+  }
+  .holm-philosophy__line {
+    font-size: clamp(1.05rem, 3.4vw, 1.5rem);
+    line-height: 1.22;
+  }
+  .holm-philosophy__beat[data-final="true"] .holm-philosophy__line {
+    font-size: clamp(1.2rem, 4vw, 1.7rem);
+  }
+  .holm-philosophy__cta {
+    margin-top: 1.4rem;
+    width: clamp(110px, 18vw, 150px);
+    font-size: clamp(0.9rem, 1.6vw, 1.1rem);
   }
 }
 

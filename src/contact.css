@@ -15,8 +15,8 @@
    filled white — filter: invert(1) turns them black on the light bg. */
 .holm-contact__brand {
   position: fixed;
-  top: clamp(1.2rem, 2.4vh, 2.4rem);
-  left: clamp(1.2rem, 2.4vw, 2.4rem);
+  top: max(clamp(1.2rem, 2.4vh, 2.4rem), env(safe-area-inset-top));
+  left: max(clamp(1.2rem, 2.4vw, 2.4rem), env(safe-area-inset-left));
   z-index: 5;
   display: inline-flex;
   pointer-events: auto;
@@ -51,6 +51,9 @@
   display: grid;
   grid-template-rows: 50vh 1fr;
   padding: 4vh 6vw;
+  padding-left:   max(6vw, env(safe-area-inset-left));
+  padding-right:  max(6vw, env(safe-area-inset-right));
+  padding-bottom: max(4vh, env(safe-area-inset-bottom));
   pointer-events: none;
 }
 
@@ -234,6 +237,18 @@
      the ring so it's still felt but doesn't hit the compositor as hard */
   .holm-contact__orb::before {
     opacity: 0.4;
+  }
+}
+
+/* ─── Very narrow phones (< 380px) — extra tightening ────────── */
+@media (max-width: 380px) {
+  .holm-contact__links {
+    gap: 0.4rem;
+  }
+  .holm-contact__orb {
+    width:     clamp(78px, 26vw, 100px);
+    font-size: clamp(0.66rem, 3vw, 0.82rem);
+    padding:   0.55rem;
   }
 }
 

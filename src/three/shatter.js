@@ -18,9 +18,15 @@ const GRID_DEPTH     = 3.5;
 const SCATTER_DIST   = 8;
 const CUBE_THICKNESS = 0.04;
 
+// Grid resolution — desktop reads as a fine mosaic; mobile used to be so
+// coarse (10×6 = 60 tiles) that "shatter" looked like six moving blocks and
+// "gather" snapped together. 22×12 (264 tiles) still runs comfortably on
+// phone GPUs (single instanced draw call, ~6k verts) and gives real
+// fragmentation. Scatter distance also nudged up so the pieces actually
+// clear the frame during the hold phase.
 const COLS_D = 32, ROWS_D = 18; // 576 desktop
-const COLS_M = 10, ROWS_M =  6; //  60 mobile
-const SCATTER_DIST_M = 5;
+const COLS_M = 22, ROWS_M = 12; // 264 mobile
+const SCATTER_DIST_M = 7;
 
 const TINT_COLOR = new THREE.Color(0x203050); // cool stone blue during gather
 const TINT_MAX   = 0.55;
@@ -38,10 +44,13 @@ export function createShatterEffect(renderer, scene, camera, isMobile) {
   const DIST = isMobile ? SCATTER_DIST_M : SCATTER_DIST;
 
   // ── FBO ──────────────────────────────────────────────────────────────────
+  // Mobile FBO bumped from 0.5→0.7 res because with the higher tile count
+  // above, each cube is sampling a smaller uv patch — 0.5 res made tiles
+  // look blocky. 0.7 is still ~half the fill of full-res.
   const rSize = renderer.getSize(new THREE.Vector2());
   const fbo   = new THREE.WebGLRenderTarget(
-    Math.floor(rSize.x * (isMobile ? 0.5 : 1.0)),
-    Math.floor(rSize.y * (isMobile ? 0.5 : 1.0)),
+    Math.floor(rSize.x * (isMobile ? 0.7 : 1.0)),
+    Math.floor(rSize.y * (isMobile ? 0.7 : 1.0)),
     { minFilter: THREE.LinearFilter, magFilter: THREE.LinearFilter },
   );
 

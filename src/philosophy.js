@@ -13,7 +13,12 @@ const POS_LERP           = 0.09;       // per-frame lerp toward beat target (@60
 const SCROLL_TILT_MAX    = 0.18;       // rad — X tilt at scroll = 1
 
 // ─── Fluid gradient backdrop tunables ────────────────────────────────
-const FLUID_RES_SCALE   = 0.5;         // fraction of viewport for sim (perf)
+// Mobile GPUs choke on the fluid sim + display pass at half-res; drop to ~28%
+// resolution on phones. The gradient is a soft background — the resolution
+// hit is invisible but the frame-rate win is massive.
+const _MOBILE_HINT       = typeof window !== "undefined"
+  && (window.innerWidth < 768 || "ontouchstart" in window);
+const FLUID_RES_SCALE   = _MOBILE_HINT ? 0.28 : 0.5;
 const FLUID_BRUSH_SIZE  = 22.0;
 const FLUID_BRUSH_STR   = 0.30;
 const FLUID_DECAY       = 0.985;
@@ -78,7 +83,7 @@ void main() {
          B = v + vec2( 1.0, -1.0),
          C = v + vec2(-1.0,  1.0),
          D = v + vec2(-1.0, -1.0);
-    for (int i = 0; i < 8; i++) {
+    for (int i = 0; i < FLUID_ITER; i++) {
       v -= t(v).xy;
       A -= t(A).xy;
       B -= t(B).xy;
@@ -541,7 +546,9 @@ export class Philosophy {
     if (this._ctaLeave) window.removeEventListener("mouseleave", this._ctaLeave);
 
     if (this.diamond) {
-      this.diamond.geometry.dispose();
+      // Geometry is a shared cache entry (see _getBrilliantGeometry) — don't
+      // dispose it here or a re-entry of the page would rebuild it and defeat
+      // the whole cache. Material is per-instance.
       this.diamond.material.dispose();
     }
     if (this._heroPlane) {
@@ -647,7 +654,10 @@ export class Philosophy {
       alpha:            false,
       powerPreference:  "high-performance",
     });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.5 : 2));
+    // Cap the DPR aggressively on mobile — 1.0 keeps the fluid + transmission
+    // fill-rate manageable without a visible sharpness drop for a soft
+    // gradient + glass composition.
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.0 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
     this.renderer.toneMappingExposure = 0.55;
@@ -675,19 +685,21 @@ export class Philosophy {
     this.scene.environment          = this.envMap;
     this.scene.environmentIntensity = ENVMAP_INTENSITY;
 
-    // Composer with UnrealBloomPass — makes the sparkle catches read
-    // as actual light, not just bright pixels
+    // Composer — bloom is skipped on mobile (a 3-tap gaussian pyramid on
+    // top of transmission is the single biggest frame-time hit on phones).
     this._composer = new EffectComposer(this.renderer);
     this._composer.setPixelRatio(this.renderer.getPixelRatio());
     this._composer.setSize(window.innerWidth, window.innerHeight);
     this._composer.addPass(new RenderPass(this.scene, this.camera));
-    this._bloom = new UnrealBloomPass(
-      new THREE.Vector2(window.innerWidth, window.innerHeight),
-      0.28,   // strength — a whisper, not a wash
-      0.35,   // radius
-      0.98,   // threshold — only near-white pixels bloom
-    );
-    this._composer.addPass(this._bloom);
+    if (!this._isMobile) {
+      this._bloom = new UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        0.28,   // strength — a whisper, not a wash
+        0.35,   // radius
+        0.98,   // threshold — only near-white pixels bloom
+      );
+      this._composer.addPass(this._bloom);
+    }
     this._composer.addPass(new OutputPass());
 
     // Diamond
@@ -818,8 +830,11 @@ export class Philosophy {
     const width   = Math.max(halfW * 2 * 1.15, 20);
     const height  = width / (cv.width / cv.height);
 
-    // Higher subdivision so the traveling wave and cursor ring look smooth
-    const geo = new THREE.PlaneGeometry(width, height, 96, 24);
+    // Higher subdivision so the traveling wave and cursor ring look smooth.
+    // Mobile: cut way down — the ripple is very subtle at phone sizes and
+    // ~2300 verts here isn't worth the vertex cost during the intro fade.
+    const seg = this._isMobile ? [32, 8] : [96, 24];
+    const geo = new THREE.PlaneGeometry(width, height, seg[0], seg[1]);
     this._heroPlane = new THREE.Mesh(geo, mat);
     this._heroPlane.position.z = HERO_Z;
     this._heroPlane.renderOrder = -1;
@@ -862,6 +877,12 @@ export class Philosophy {
     this._fluidMat = new THREE.ShaderMaterial({
       vertexShader:   FLUID_VERT,
       fragmentShader: FLUID_FRAG,
+      defines: {
+        // Mobile: 4 advection steps instead of 8. Halves the per-pixel
+        // texture reads inside the fluid pass with no perceivable quality
+        // change on the soft gradient we display through it.
+        FLUID_ITER: this._isMobile ? 4 : 8,
+      },
       uniforms: {
         iTime:          { value: 0 },
         iResolution:    { value: new THREE.Vector2(w, h) },
@@ -904,6 +925,15 @@ export class Philosophy {
   _stepFluid(elapsed) {
     if (!this._fluidMat) return;
 
+    // Mobile: run the fluid sim every other frame. The gradient reads as
+    // continuous motion at ~30Hz because the display pass is a smooth
+    // function of the state — halving the update rate is invisible but
+    // roughly halves the fluid-sim GPU cost.
+    if (this._isMobile && (this._fluidFrame & 1) === 1) {
+      this._fluidFrame++;
+      return;
+    }
+
     // Cursor input: if it's been quiet for >100ms, zero the input
     if (performance.now() - this._lastMouseMoveMs > 100) {
       this._fluidMat.uniforms.iMouse.value.set(0, 0, 0, 0);
@@ -936,40 +966,55 @@ export class Philosophy {
   }
 
   _createDiamond() {
-    // Brilliant-cut mesh, higher tessellation for cleaner facets
-    const geom = this._createBrilliantGeometry(48);
-    geom.scale(0.92, 1.06, 0.92);
-    geom.computeVertexNormals();
+    // Brilliant-cut mesh — mobile gets a lower tessellation. Fill-rate on
+    // transmission scales with fragment count, not vertex count, so the win
+    // here is smaller than dropping DPR — but it still helps overdraw.
+    // Geometry is memoized per tessellation on the class so re-entering the
+    // page doesn't re-run the ring-triangulation each time — DRACO would
+    // give network-payload savings for pre-authored meshes, which doesn't
+    // apply here (the mesh is runtime-generated, zero payload); memoizing
+    // the CPU cost is the equivalent win for procedural geometry.
+    const N = this._isMobile ? 24 : 48;
+    const geom = Philosophy._getBrilliantGeometry(N);
 
     // MeshPhysicalMaterial tuned for the RoomEnvironment PMREM.
-    // Every param picked to give a physically-plausible diamond that reads
-    // as glass with fire, not as a smoked lump.
+    // On mobile: iridescence, clearcoat and dispersion are dropped — each
+    // adds a full-quality lighting pass on top of the already-expensive
+    // transmission. The diamond still reads as glass without them.
+    const isMobile = this._isMobile;
     const mat = new THREE.MeshPhysicalMaterial({
       color:                     0xffffff,
       metalness:                 0.0,
       roughness:                 0.0,               // mirror facets
       transmission:              1.0,
-      thickness:                 this._isMobile ? 1.2 : 1.8,
+      thickness:                 isMobile ? 1.2 : 1.8,
       ior:                       2.417,             // real diamond
       attenuationDistance:       6.0,
       attenuationColor:          new THREE.Color(0xffffff),
-      envMapIntensity:           2.2,
-      iridescence:               0.35,              // subtle rainbow at grazing angles
+      envMapIntensity:           isMobile ? 1.7 : 2.2,
+      iridescence:               isMobile ? 0.0 : 0.35,
       iridescenceIOR:            1.55,
       iridescenceThicknessRange: [400, 900],
-      clearcoat:                 1.0,
+      clearcoat:                 isMobile ? 0.0 : 1.0,
       clearcoatRoughness:        0.0,
       transparent:               true,
-      side:                      THREE.DoubleSide,
+      side:                      isMobile ? THREE.FrontSide : THREE.DoubleSide,
     });
-    if ("dispersion" in mat) mat.dispersion = 3.2;  // fire without the rainbow blur
+    if (!isMobile && "dispersion" in mat) mat.dispersion = 3.2;  // fire without the rainbow blur
 
     this.diamond = new THREE.Mesh(geom, mat);
     this.diamond.rotation.x = -0.18;
     this.scene.add(this.diamond);
   }
 
-  _createBrilliantGeometry(N = 24) {
+  // Cached brilliant-cut geometry. Keyed by tessellation N so mobile and
+  // desktop each get one bake. The returned BufferGeometry is a shared
+  // instance — destroy() must not dispose it (guarded by _sharedGeom).
+  static _getBrilliantGeometry(N) {
+    if (!Philosophy._geomCache) Philosophy._geomCache = new Map();
+    let g = Philosophy._geomCache.get(N);
+    if (g) return g;
+
     const positions = [];
     const indices   = [];
     const halfStep  = Math.PI / N;
@@ -1015,9 +1060,14 @@ export class Philosophy {
         }
       }
     }
-    const g = new THREE.BufferGeometry();
+    g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     g.setIndex(indices);
+    // Bake the visual scale + normals once so the mesh factory can use the
+    // shared buffer directly without further processing per instance.
+    g.scale(0.92, 1.06, 0.92);
+    g.computeVertexNormals();
+    Philosophy._geomCache.set(N, g);
     return g;
   }
 
@@ -1245,7 +1295,12 @@ export class Philosophy {
       const k = 1 - Math.pow(1 - POS_LERP, dt * 60);
       this.diamond.position.lerp(this._targetPos, k);
 
-      const curS = this.diamond.scale.x + (target.scale - this.diamond.scale.x) * k;
+      // Mobile: shrink the diamond so it stays a "jewel" on screen and
+      // doesn't overwhelm the stanza sitting below it. 0.62 hits the
+      // sweet spot at all beats (biggest beat scale 1.35 × 0.62 ≈ 0.84,
+      // smallest 0.62 × 0.62 ≈ 0.38 — still readable as a diamond).
+      const scaleTarget = narrow ? target.scale * 0.62 : target.scale;
+      const curS = this.diamond.scale.x + (scaleTarget - this.diamond.scale.x) * k;
       this.diamond.scale.setScalar(curS);
 
       // Hero watermark plane — visible on the intro, fades as the user
