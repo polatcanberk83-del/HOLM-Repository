@@ -333,14 +333,17 @@ const arrivedViaTransition = (() => {
 // Site-wide page transition — grid shutter cover-and-hold on nav
 mountPageTransition();
 
-// Room-guide menu — always mounted; book-a-call is hidden while the menu
-// takes the corner slot. Every page is shipped publicly now.
-const menu = new Menu({ lenis });
-menu.mount();
-// Re-scan for [data-hover-roll] targets now that the menu DOM exists
-initHoverRoll(document);
-const bookCall = document.getElementById("book-call");
-if (bookCall) bookCall.style.display = "none";
+// Dev-only room-guide menu — production ships with the "Book a call" button
+// visible instead. On localhost we mount the menu and hide book-a-call so
+// dev navigation to other pages still works.
+if (import.meta.env.DEV) {
+  const menu = new Menu({ lenis });
+  menu.mount();
+  // Re-scan for [data-hover-roll] targets now that the menu DOM exists
+  initHoverRoll(document);
+  const bookCall = document.getElementById("book-call");
+  if (bookCall) bookCall.style.display = "none";
+}
 
 lenis.on("scroll", ({ scroll, limit }) => {
   splineT = limit > 0 ? scroll / limit : 0;
