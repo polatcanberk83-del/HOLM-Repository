@@ -29,6 +29,12 @@ const ROOMS = [
   },
   {
     num:  "03",
+    name: "About",
+    href: "/about/",
+    match: (p) => p.startsWith("/about"),
+  },
+  {
+    num:  "04",
     name: "Contact",
     href: "/contact/",
     match: (p) => p.startsWith("/contact"),

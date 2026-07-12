@@ -10,6 +10,7 @@ export default defineConfig({
       input: {
         main:       resolve(__dirname, 'index.html'),
         philosophy: resolve(__dirname, 'philosophy/index.html'),
+        about:      resolve(__dirname, 'about/index.html'),
         contact:    resolve(__dirname, 'contact/index.html'),
       },
     },

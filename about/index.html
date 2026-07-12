@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HOLM — About</title>
+
+    <script>
+      try {
+        if (sessionStorage.getItem("holm:transition") === "1") {
+          document.documentElement.classList.add("holm-entering");
+        }
+      } catch (_) {}
+    </script>
+    <style>
+      html.holm-entering, html.holm-entering body { background: #000000 !important; }
+    </style>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,300;0,400;1,300&display=swap" rel="stylesheet">
+
+    <style>
+      :root {
+        --holm-display-font: 'Fraunces', 'Times New Roman', serif;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        background: #0a0806;
+        color: #f0e6d8;
+        font-family: 'Fraunces', serif;
+        overflow-x: hidden;
+        overscroll-behavior-y: none;
+      }
+      body { min-height: 100vh; }
+
+      .holm-skip {
+        position: fixed;
+        top: 8px; left: 8px;
+        z-index: 1200;
+        padding: 10px 16px;
+        background: #ffffff;
+        color: #0a0a12;
+        font-family: 'Fraunces', serif;
+        font-size: 0.85rem;
+        letter-spacing: 0.06em;
+        text-decoration: none;
+        border-radius: 2px;
+        transform: translateY(-140%);
+        transition: transform 0.24s ease;
+      }
+      .holm-skip:focus-visible {
+        transform: translateY(0);
+        outline: 2px solid rgba(210, 175, 120, 0.9);
+        outline-offset: 2px;
+      }
+      :focus { outline: none; }
+      a:focus-visible, button:focus-visible {
+        outline: 2px solid rgba(240, 220, 190, 0.9);
+        outline-offset: 3px;
+        border-radius: 2px;
+      }
+    </style>
+  </head>
+  <body>
+    <a class="holm-skip" href="#about-content">Skip to content</a>
+    <script type="module" src="/src/about-entry.js"></script>
+  </body>
+</html>

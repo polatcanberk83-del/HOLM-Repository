@@ -1,0 +1,283 @@
+/* ═══ HOLM About page — "The Workbench" ══════════════════════════════ */
+
+.holm-about {
+  position: relative;
+  color: rgba(240, 224, 200, 0.94);
+  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
+  background: #0a0806;
+  isolation: isolate;
+}
+
+/* WebGL canvas — draws the workbench scene */
+.holm-about__canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
+/* Warm colour-cast vignette layered above the WebGL canvas — sells the
+   "single lamp on a desk" feeling without another render pass */
+.holm-about__vignette {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(80% 60% at 50% 40%,
+      transparent 0%,
+      rgba(0, 0, 0, 0.35) 60%,
+      rgba(0, 0, 0, 0.85) 100%);
+}
+
+/* Intro screen — empty first viewport so the wide desk shot lands */
+.holm-about__intro {
+  position: relative;
+  z-index: 2;
+  height: 100vh;
+  pointer-events: none;
+}
+
+/* Beats — one 100vh section per faset */
+.holm-about__beats {
+  position: relative;
+  z-index: 2;
+}
+
+.holm-about__beat {
+  position: relative;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  padding: 0 6vw;
+  padding-left:  max(6vw, env(safe-area-inset-left));
+  padding-right: max(6vw, env(safe-area-inset-right));
+}
+
+.holm-about__stanza {
+  position: relative;
+  max-width: min(42%, 620px);
+}
+
+/* Text sides — right/left */
+.holm-about__beat[data-side="left"]  .holm-about__stanza {
+  margin-right: auto;
+  text-align: left;
+}
+.holm-about__beat[data-side="right"] .holm-about__stanza {
+  margin-left: auto;
+  text-align: right;
+}
+.holm-about__beat[data-side="below"] .holm-about__stanza {
+  margin: auto auto 10vh;
+  max-width: min(56%, 720px);
+  align-self: flex-end;
+  text-align: center;
+}
+
+/* Section eyebrow — small caps label so each beat has a title */
+.holm-about__eyebrow {
+  display: block;
+  font-family: var(--holm-display-font, 'Fraunces', serif);
+  font-weight: 400;
+  font-style: normal;
+  font-size: clamp(0.7rem, 0.85vw, 0.85rem);
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: rgba(215, 175, 130, 0.72);
+  margin-bottom: 1.1rem;
+}
+
+.holm-about__line {
+  overflow: visible;
+  padding: 0.06em 0;
+  font-family: var(--holm-display-font, 'Fraunces', serif);
+  font-weight: 300;
+  font-style: normal;
+  font-size: clamp(1.35rem, 2.4vw, 2.1rem);
+  line-height: 1.4;
+  letter-spacing: 0.004em;
+  color: rgba(248, 236, 218, 0.98);
+  text-shadow: 0 1px 22px rgba(0, 0, 0, 0.6);
+}
+.holm-about__line + .holm-about__line { margin-top: 0.35em; }
+
+/* First line of each stanza reads as the "headline" — a touch heavier */
+.holm-about__line--head {
+  font-family: var(--holm-display-font, 'Fraunces', serif);
+  font-style: italic;
+  font-weight: 300;
+  font-size: clamp(1.7rem, 3vw, 2.6rem);
+  color: #ffffff;
+  margin-bottom: 0.3em;
+}
+
+.holm-about__word {
+  display: inline-block;
+  overflow: hidden;
+  padding: 0.06em 0;
+  vertical-align: bottom;
+  will-change: transform;
+}
+.holm-about__char {
+  display: inline-block;
+  will-change: transform, opacity;
+}
+
+/* ─── Portrait slot — placeholder soft rectangle, replace src later ─── */
+.holm-about__portrait {
+  display: block;
+  width: clamp(140px, 12vw, 190px);
+  aspect-ratio: 3 / 4;
+  margin-bottom: 1.6rem;
+  border-radius: 3px;
+  background:
+    linear-gradient(160deg,
+      rgba(60, 45, 32, 0.85) 0%,
+      rgba(24, 18, 12, 0.9)  100%);
+  box-shadow:
+    0 20px 44px rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(240, 220, 190, 0.14);
+  overflow: hidden;
+  filter: grayscale(0.35) contrast(1.05);
+}
+.holm-about__portrait img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ─── Closing CTA — filled circular pill, echoes philosophy ────────── */
+.holm-about__cta {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: clamp(150px, 13vw, 184px);
+  aspect-ratio: 1 / 1;
+  margin: 3rem auto 0;
+  border-radius: 50%;
+  background: rgba(248, 236, 216, 0.96);
+  color: rgba(20, 14, 8, 0.94);
+  text-decoration: none;
+  font-family: var(--holm-display-font, 'Fraunces', serif);
+  font-style: normal;
+  font-weight: 400;
+  font-size: clamp(1.02rem, 1.28vw, 1.3rem);
+  letter-spacing: 0.01em;
+  line-height: 1;
+  cursor: pointer;
+  overflow: visible;
+  isolation: isolate;
+  box-shadow:
+    0 12px 44px rgba(215, 175, 120, 0.22),
+    0 0 0 1px rgba(255, 240, 220, 0.05) inset;
+  transition:
+    background 0.4s cubic-bezier(0.6, 0.05, 0.2, 1),
+    box-shadow 0.4s cubic-bezier(0.6, 0.05, 0.2, 1);
+  will-change: transform, opacity;
+}
+.holm-about__cta:hover,
+.holm-about__cta.is-magnetic {
+  background: rgba(255, 246, 230, 1);
+  box-shadow:
+    0 22px 72px rgba(230, 190, 140, 0.36),
+    0 0 0 1px rgba(255, 245, 225, 0.12) inset;
+}
+
+/* ─── Tablet portrait ─────────────────────────────────────────────── */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .holm-about__stanza,
+  .holm-about__beat[data-side="left"]  .holm-about__stanza,
+  .holm-about__beat[data-side="right"] .holm-about__stanza {
+    max-width: 52%;
+  }
+  .holm-about__beat[data-side="below"] .holm-about__stanza {
+    max-width: 72%;
+  }
+  .holm-about__line {
+    font-size: clamp(1.3rem, 2.6vw, 2rem);
+  }
+}
+
+/* ─── Mobile ─────────────────────────────────────────────────────── */
+@media (max-width: 767px) {
+  .holm-about__beat {
+    padding: 0 5vw;
+    padding-left:  max(5vw, env(safe-area-inset-left));
+    padding-right: max(5vw, env(safe-area-inset-right));
+  }
+  .holm-about__stanza,
+  .holm-about__beat[data-side="left"]  .holm-about__stanza,
+  .holm-about__beat[data-side="right"] .holm-about__stanza,
+  .holm-about__beat[data-side="below"] .holm-about__stanza {
+    max-width: 88%;
+    margin: auto auto max(11vh, calc(6vh + env(safe-area-inset-bottom)));
+    align-self: flex-end;
+    text-align: left;
+  }
+  .holm-about__beat[data-side="below"] .holm-about__stanza {
+    text-align: center;
+  }
+  .holm-about__line {
+    font-size: clamp(1.15rem, 4.6vw, 1.6rem);
+    line-height: 1.35;
+  }
+  .holm-about__line--head {
+    font-size: clamp(1.4rem, 5.8vw, 1.9rem);
+  }
+  .holm-about__eyebrow {
+    font-size: clamp(0.65rem, 2.6vw, 0.75rem);
+    letter-spacing: 0.26em;
+    margin-bottom: 0.8rem;
+  }
+  .holm-about__portrait {
+    width: clamp(120px, 34vw, 160px);
+    margin-bottom: 1.2rem;
+  }
+  .holm-about__cta {
+    width: clamp(130px, 34vw, 168px);
+    margin-top: 2rem;
+  }
+}
+
+/* ─── Landscape short viewports ──────────────────────────────────── */
+@media (max-height: 500px) and (orientation: landscape) {
+  .holm-about__beat {
+    align-items: flex-end;
+    padding: 4vh 6vw;
+  }
+  .holm-about__stanza,
+  .holm-about__beat[data-side] .holm-about__stanza {
+    max-width: 72%;
+    margin: auto auto 4vh;
+  }
+  .holm-about__line       { font-size: clamp(1rem, 3.2vw, 1.4rem); line-height: 1.28; }
+  .holm-about__line--head { font-size: clamp(1.15rem, 3.8vw, 1.6rem); }
+  .holm-about__cta {
+    width: clamp(110px, 18vw, 150px);
+    margin-top: 1.2rem;
+  }
+}
+
+/* ─── Reduced motion ─────────────────────────────────────────────── */
+.holm-about.is-reduced-motion .holm-about__word { overflow: visible; }
+.holm-about.is-reduced-motion .holm-about__char {
+  opacity: 0;
+  transform: none;
+  transition: opacity 1s ease;
+}
+.holm-about.is-reduced-motion .holm-about__beat.is-in .holm-about__char {
+  opacity: 1;
+}
+.holm-about.is-reduced-motion .holm-about__stanza,
+.holm-about.is-reduced-motion .holm-about__beat[data-side] .holm-about__stanza {
+  margin: auto;
+  max-width: 62%;
+  text-align: center;
+  align-self: center;
+}
