@@ -27,15 +27,14 @@ const ROOMS = [
     href: "/philosophy/",
     match: (p) => p.startsWith("/philosophy"),
   },
-  // About room parked — restore below Philosophy when about page ships.
-  //   {
-  //     num:  "03",
-  //     name: "About",
-  //     href: "/about/",
-  //     match: (p) => p.startsWith("/about"),
-  //   },
   {
     num:  "03",
+    name: "About",
+    href: "/about/",
+    match: (p) => p.startsWith("/about"),
+  },
+  {
+    num:  "04",
     name: "Contact",
     href: "/contact/",
     match: (p) => p.startsWith("/contact"),
