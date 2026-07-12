@@ -3,12 +3,9 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>HOLM — Contact</title>
+    <title>HOLM — About</title>
 
     <script>
-      // Sync flash-preventer — if we arrived via a page transition,
-      // paint the page dark from the very first frame so the block
-      // cover reads as continuous with the previous page's cover.
       try {
         if (sessionStorage.getItem("holm:transition") === "1") {
           document.documentElement.classList.add("holm-entering");
@@ -29,8 +26,8 @@
       }
       * { margin: 0; padding: 0; box-sizing: border-box; }
       html, body {
-        background: #000;
-        color: #e6ecf5;
+        background: #0a0806;
+        color: #f0e6d8;
         font-family: 'Fraunces', serif;
         overflow-x: hidden;
         overscroll-behavior-y: none;
@@ -42,8 +39,8 @@
         top: 8px; left: 8px;
         z-index: 1200;
         padding: 10px 16px;
-        background: #0a0a12;
-        color: #ffffff;
+        background: #ffffff;
+        color: #0a0a12;
         font-family: 'Fraunces', serif;
         font-size: 0.85rem;
         letter-spacing: 0.06em;
@@ -54,23 +51,23 @@
       }
       .holm-skip:focus-visible {
         transform: translateY(0);
-        outline: 2px solid rgba(60, 100, 180, 0.9);
+        outline: 2px solid rgba(210, 175, 120, 0.9);
         outline-offset: 2px;
       }
       :focus { outline: none; }
       a:focus-visible, button:focus-visible {
-        outline: 2px solid rgba(20, 30, 60, 0.85);
+        outline: 2px solid rgba(240, 220, 190, 0.9);
         outline-offset: 3px;
         border-radius: 2px;
       }
     </style>
-    <script type="module" crossorigin src="/assets/contact-C2oVkkN6.js"></script>
+    <script type="module" crossorigin src="/assets/about-EBUtJNHI.js"></script>
     <link rel="modulepreload" crossorigin href="/assets/pageTransition-Bs_UOWXO.js">
     <link rel="modulepreload" crossorigin href="/assets/OutputPass-DsP52OyW.js">
     <link rel="stylesheet" crossorigin href="/assets/pageTransition-DfycTzcE.css">
-    <link rel="stylesheet" crossorigin href="/assets/contact-CjRrcy7L.css">
+    <link rel="stylesheet" crossorigin href="/assets/about-CGoX-6h2.css">
   </head>
   <body>
-    <a class="holm-skip" href="#contact-content">Skip to content</a>
+    <a class="holm-skip" href="#about-content">Skip to content</a>
   </body>
 </html>
