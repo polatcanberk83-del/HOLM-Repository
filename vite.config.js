@@ -10,7 +10,10 @@ export default defineConfig({
       input: {
         main:       resolve(__dirname, 'index.html'),
         philosophy: resolve(__dirname, 'philosophy/index.html'),
-        about:      resolve(__dirname, 'about/index.html'),
+        // about page is parked — source lives in about/ + src/about*.* so we
+        // can re-enable by adding this line back and the matching Menu entry.
+        // Excluded from input → not built into dist → not deployed.
+        // about:      resolve(__dirname, 'about/index.html'),
         contact:    resolve(__dirname, 'contact/index.html'),
       },
     },
