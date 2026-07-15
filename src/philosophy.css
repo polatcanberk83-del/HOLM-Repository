@@ -8,6 +8,35 @@
   isolation: isolate;
 }
 
+/* ─── Top-left brand mark — matched to the nav trigger slot ─────
+   Nav trigger sits at top:5vh; right:5vw as a 42px button, so the logo
+   uses the mirror slot (top:5vh; left:5vw) at the same 42px height. Both
+   tops + heights line up, so their vertical centers match. */
+.holm-philosophy__brand {
+  position: fixed;
+  top:  5vh;
+  left: 5vw;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  height: 42px;
+  pointer-events: auto;
+  opacity: 0.92;
+  transition: opacity 300ms ease, transform 500ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.holm-philosophy__brand:hover { opacity: 1; transform: scale(1.04); }
+.holm-philosophy__brand img {
+  display: block;
+  height: clamp(28px, 3.4vh, 44px);   /* same as about/contact */
+  width: auto;
+  /* SVG paths ship white — force white regardless of source fill */
+  filter: brightness(0) invert(1);
+}
+
+@media (max-width: 560px) {
+  .holm-philosophy__brand { top: 4vh; left: 6vw; }
+}
+
 /* ─── WebGL layer (canvas draws the diamond + the hero watermark plane) ─ */
 .holm-philosophy__canvas {
   position: fixed;

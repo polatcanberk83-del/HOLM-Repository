@@ -1,10 +1,10 @@
 import * as THREE from "three";
 import gsap from "gsap";
-import { RoomEnvironment }  from "three/examples/jsm/environments/RoomEnvironment.js";
 import { EffectComposer }   from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass }       from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass }  from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass }       from "three/examples/jsm/postprocessing/OutputPass.js";
+import logoUrl              from "./assets/holm new logo.svg?url";
 import "./philosophy.css";
 
 // ─── Tunables ────────────────────────────────────────────────────────
@@ -18,7 +18,7 @@ const SCROLL_TILT_MAX    = 0.18;       // rad — X tilt at scroll = 1
 // hit is invisible but the frame-rate win is massive.
 const _MOBILE_HINT       = typeof window !== "undefined"
   && (window.innerWidth < 768 || "ontouchstart" in window);
-const FLUID_RES_SCALE   = _MOBILE_HINT ? 0.28 : 0.5;
+const FLUID_RES_SCALE   = _MOBILE_HINT ? 0.22 : 0.5;
 const FLUID_BRUSH_SIZE  = 22.0;
 const FLUID_BRUSH_STR   = 0.30;
 const FLUID_DECAY       = 0.985;
@@ -556,6 +556,10 @@ export class Philosophy {
       this._heroPlane.material.uniforms?.uTextMap?.value?.dispose();
       this._heroPlane.material.dispose();
     }
+    if (this._causticPlane) {
+      this._causticPlane.geometry.dispose();
+      this._causticPlane.material.dispose();
+    }
     if (this.envMap) this.envMap.dispose();
     for (const l of this._lights) this.scene?.remove(l);
 
@@ -619,6 +623,10 @@ export class Philosophy {
     container.innerHTML = `
       <canvas class="holm-philosophy__canvas" aria-hidden="true"></canvas>
 
+      <a class="holm-philosophy__brand" href="/" aria-label="HOLM — home">
+        <img src="${logoUrl}" alt="HOLM" />
+      </a>
+
       <section class="holm-philosophy__intro" data-beat="0" aria-hidden="true"></section>
 
       <main id="philosophy-content"
@@ -663,7 +671,7 @@ export class Philosophy {
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, this._isMobile ? 1.0 : 2));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
     this.renderer.toneMapping         = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 0.55;
+    this.renderer.toneMappingExposure = 0.75;
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
@@ -677,19 +685,26 @@ export class Philosophy {
     this.camera.position.set(0, 0, CAM_Z_BASE);
     this.camera.lookAt(0, 0, 0);
 
-    // Photorealistic env — RoomEnvironment baked through PMREM.
-    // This is what Three.js's official glass demos use; it delivers the
-    // studio-showcase reflections and refractions that a procedural
-    // gradient cannot.
-    const pmrem   = new THREE.PMREMGenerator(this.renderer);
-    const roomEnv = new RoomEnvironment();
-    this.envMap   = pmrem.fromScene(roomEnv, 0.04).texture;
+    // Bespoke studio HDRI — a small procedural scene of bright emissive
+    // spheres (HDR color values > 1) baked through PMREM. Small, sharp
+    // sources give the diamond characteristic per-facet sparkle when it
+    // rotates; a soft dark-blue sky sphere prevents the reflections from
+    // reading gray. Baked once, then disposed.
+    const pmrem      = new THREE.PMREMGenerator(this.renderer);
+    const envScene   = this._buildStudioEnvScene();
+    this.envMap      = pmrem.fromScene(envScene, 0.02).texture;
+    envScene.traverse((o) => {
+      if (o.geometry) o.geometry.dispose();
+      if (o.material) o.material.dispose();
+    });
     pmrem.dispose();
     this.scene.environment          = this.envMap;
-    this.scene.environmentIntensity = ENVMAP_INTENSITY;
+    this.scene.environmentIntensity = 1.5;
 
-    // Composer — bloom is skipped on mobile (a 3-tap gaussian pyramid on
-    // top of transmission is the single biggest frame-time hit on phones).
+    // Composer — bloom is desktop-only. On mobile the transmission +
+    // fluid + dispersion budget is already tight; an extra fullscreen
+    // bloom pass would push us into a stutter zone with negligible visual
+    // gain on small screens.
     this._composer = new EffectComposer(this.renderer);
     this._composer.setPixelRatio(this.renderer.getPixelRatio());
     this._composer.setSize(window.innerWidth, window.innerHeight);
@@ -697,22 +712,159 @@ export class Philosophy {
     if (!this._isMobile) {
       this._bloom = new UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        0.28,   // strength — a whisper, not a wash
-        0.35,   // radius
-        0.98,   // threshold — only near-white pixels bloom
+        0.18,   // strength
+        0.22,   // radius
+        0.92,   // threshold
       );
       this._composer.addPass(this._bloom);
     }
     this._composer.addPass(new OutputPass());
 
+    // Caustic halo — desktop-only. It's an extra shader-plane draw with
+    // a 4-iteration noise loop per pixel; small quality lift, real cost.
+    if (!this._isMobile) this._createCausticPlane();
+
     // Diamond
     this._createDiamond();
 
-    // "philosophy" watermark plane behind the gem
-    this._createHeroPlane();
+    // "philosophy" watermark plane — desktop-only. The plane samples the
+    // fluid texture per-pixel and does chromatic aberration on 3 lookups
+    // of the text atlas; on mobile this is a large fill-rate hit that
+    // isn't worth the decorative gain.
+    if (!this._isMobile) this._createHeroPlane();
 
     // Lights
     this._addLights();
+  }
+
+  // Bespoke studio-lighting scene — bright emissive spheres with HDR-range
+  // colors (multiplied past 1.0) around a soft dark-blue sky sphere. When
+  // baked through PMREM, small sources become the sharp highlights the
+  // diamond's facets sample; the sky keeps ambient reflections in the
+  // cool palette that matches the fluid backdrop.
+  _buildStudioEnvScene() {
+    const s = new THREE.Scene();
+
+    // Sky sphere — inside-out, vertical gradient with the site's palette
+    const skyGeo = new THREE.SphereGeometry(30, 24, 12);
+    const skyMat = new THREE.ShaderMaterial({
+      side: THREE.BackSide,
+      vertexShader: /* glsl */`
+        varying vec3 vP;
+        void main() {
+          vP = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        varying vec3 vP;
+        void main() {
+          vec3 d = normalize(vP);
+          float t = d.y * 0.5 + 0.5;
+          // Neutral dark ambient — bright enough that facets never fall
+          // to pure black between hot spots, dim enough that the light
+          // sources still dominate. This is what stops the gem from
+          // reading matte.
+          vec3 top = vec3(0.05, 0.055, 0.070);
+          vec3 bot = vec3(0.010, 0.010, 0.014);
+          gl_FragColor = vec4(mix(bot, top, t), 1.0);
+        }
+      `,
+    });
+    s.add(new THREE.Mesh(skyGeo, skyMat));
+
+    const addLight = (x, y, z, colorHex, mult, size) => {
+      const g = new THREE.SphereGeometry(size, 12, 8);
+      const m = new THREE.MeshBasicMaterial({ color: colorHex });
+      m.color.multiplyScalar(mult);
+      const mesh = new THREE.Mesh(g, m);
+      mesh.position.set(x, y, z);
+      s.add(mesh);
+    };
+
+    // Three-point WHITE studio rig — a real diamond reads as colorless;
+    // any color you see is dispersion splitting white light. So the env
+    // stays 90% neutral white; warm/cool accents are small and low.
+    addLight( 7,  6,  5, 0xffffff, 45, 0.85);   // Key (upper right)
+    addLight(-6,  3,  4, 0xf6f8ff, 24, 1.2);    // Fill (upper left, hint cool)
+    addLight( 0,  6, -7, 0xffffff, 30, 0.9);    // Rim (behind top)
+
+    // Subtle temperature accents — small enough not to tint the whole gem,
+    // just to give the pavilion a little warm/cool life
+    addLight( 5, -2,  4, 0xffd8a0, 14, 0.45);   // warm accent, lower right
+    addLight(-6, -1,  3, 0xa8c8ff, 14, 0.45);   // cool accent, lower left
+
+    // Pinpoint white sparks — the "fire" the bloom pass turns into stars
+    addLight(-11,  1,  0, 0xffffff, 65, 0.2);
+    addLight( 11,  1,  0, 0xffffff, 65, 0.2);
+    addLight(  0, -3,  9, 0xffffff, 40, 0.3);
+
+    return s;
+  }
+
+  // Caustic halo plane — a soft radial "underwater light" pattern that
+  // trails the diamond's XY position. Additively blended, low intensity;
+  // its purpose is atmospheric — a hint that the gem is projecting energy
+  // rather than a hard visual feature.
+  _createCausticPlane() {
+    const geo = new THREE.PlaneGeometry(5.0, 5.0, 1, 1);
+    const mat = new THREE.ShaderMaterial({
+      transparent:  true,
+      depthWrite:   false,
+      blending:     THREE.AdditiveBlending,
+      uniforms: {
+        uTime:      { value: 0 },
+        uIntensity: { value: 0.55 },
+      },
+      vertexShader: /* glsl */`
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: /* glsl */`
+        uniform float uTime;
+        uniform float uIntensity;
+        varying vec2  vUv;
+
+        // Caustic pattern — classic domain-warped noise (public-domain
+        // technique commonly attributed to David Hoskins). Cheap: 4 iters.
+        float caustic(vec2 uv, float t) {
+          vec2 p = mod(uv * 6.28318 - 250.0, 6.28318) - 250.0;
+          vec2 i = p;
+          float c    = 1.0;
+          float inten = 0.006;
+          for (int n = 0; n < 4; n++) {
+            float ti = t + float(n) * 0.42;
+            i = p + vec2(cos(ti - i.x) + sin(ti + i.y),
+                         sin(ti - i.y) + cos(ti + i.x));
+            c += 1.0 / length(vec2(p.x / (sin(i.x + ti) / inten),
+                                   p.y / (cos(i.y + ti) / inten)));
+          }
+          c /= 4.0;
+          c  = 1.17 - pow(c, 1.4);
+          return pow(abs(c), 7.0);
+        }
+
+        void main() {
+          vec2  uv     = vUv - 0.5;
+          float r      = length(uv);
+          // Radial mask — bright right around the gem, gone by the edges
+          float halo   = smoothstep(0.5, 0.03, r);
+          float caus   = caustic(uv * 0.9, uTime * 0.16);
+          // Cool blue that echoes the fluid backdrop palette
+          vec3  tint   = vec3(0.38, 0.60, 1.00);
+          float energy = caus * halo * uIntensity;
+          gl_FragColor = vec4(tint * energy, energy * 0.75);
+        }
+      `,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.z = -1.2;
+    mesh.renderOrder = -1;   // renders before the diamond → visible through refraction
+    this._causticPlane = mesh;
+    this.scene.add(mesh);
   }
 
   _createHeroPlane() {
@@ -969,105 +1121,171 @@ export class Philosophy {
   }
 
   _createDiamond() {
-    // Brilliant-cut mesh — mobile gets a lower tessellation. Fill-rate on
-    // transmission scales with fragment count, not vertex count, so the win
-    // here is smaller than dropping DPR — but it still helps overdraw.
-    // Geometry is memoized per tessellation on the class so re-entering the
-    // page doesn't re-run the ring-triangulation each time — DRACO would
-    // give network-payload savings for pre-authored meshes, which doesn't
-    // apply here (the mesh is runtime-generated, zero payload); memoizing
-    // the CPU cost is the equivalent win for procedural geometry.
-    const N = this._isMobile ? 24 : 48;
+    // Brilliant-cut mesh — proper diamond proportions (wide girdle, shallow
+    // crown, deeper pavilion). N sides at each ring; each triangle carries
+    // its own vertex copies so computeVertexNormals gives per-face normals
+    // — the crown/pavilion facets read as hard, planar sparkle surfaces
+    // instead of a smooth blob. Mobile uses fewer sides.
+    const N = this._isMobile ? 12 : 16;
     const geom = Philosophy._getBrilliantGeometry(N);
 
-    // MeshPhysicalMaterial tuned for the RoomEnvironment PMREM.
-    // On mobile: iridescence, clearcoat and dispersion are dropped — each
-    // adds a full-quality lighting pass on top of the already-expensive
-    // transmission. The diamond still reads as glass without them.
+    // MeshPhysicalMaterial tuned for SOTD-level diamond fire:
+    //   • roughness 0 + clearcoat 1  → mirror-crisp facet reflections
+    //   • thickness 2.5, dispersion 6.5 → strong rainbow fire through the body
+    //   • envMapIntensity 2.8         → the room lights bake as hot sparks
+    //     which the bloom pass then blooms into visible sparkle
     const isMobile = this._isMobile;
     const mat = new THREE.MeshPhysicalMaterial({
       color:                     0xffffff,
       metalness:                 0.0,
-      roughness:                 0.0,               // mirror facets
+      roughness:                 isMobile ? 0.02 : 0.0,
       transmission:              1.0,
-      thickness:                 isMobile ? 1.2 : 1.8,
-      ior:                       2.417,             // real diamond
-      attenuationDistance:       6.0,
+      thickness:                 isMobile ? 1.0 : 2.5,
+      ior:                       2.417,                    // real diamond
+      attenuationDistance:       12.0,
       attenuationColor:          new THREE.Color(0xffffff),
-      envMapIntensity:           isMobile ? 1.7 : 2.2,
-      iridescence:               isMobile ? 0.0 : 0.35,
+      envMapIntensity:           isMobile ? 1.5 : 2.8,
+      // Mobile: drop iridescence + clearcoat + dispersion entirely.
+      // Each is a full extra lighting pass on top of transmission;
+      // together they can double the fragment cost.
+      iridescence:               isMobile ? 0.0 : 0.25,
       iridescenceIOR:            1.55,
       iridescenceThicknessRange: [400, 900],
       clearcoat:                 isMobile ? 0.0 : 1.0,
       clearcoatRoughness:        0.0,
       transparent:               true,
-      side:                      isMobile ? THREE.FrontSide : THREE.DoubleSide,
+      side:                      THREE.FrontSide,
     });
-    if (!isMobile && "dispersion" in mat) mat.dispersion = 3.2;  // fire without the rainbow blur
+    if (!isMobile && "dispersion" in mat) mat.dispersion = 6.5;
+
+    // Facet-edge chromatic aberration — injected into the shader so that
+    // at grazing angles (where facets read as edges) we add a slow-moving
+    // rainbow tint. This fakes the multi-bounce dispersion three.js can't
+    // simulate: real diamonds show sharp rainbow layers on edges; we
+    // approximate with a fresnel-driven hue cycle on top of the material.
+    if (!isMobile) {
+      mat.userData.uEdgeTime = { value: 0 };
+      mat.onBeforeCompile = (shader) => {
+        shader.uniforms.uEdgeTime = mat.userData.uEdgeTime;
+        shader.vertexShader = shader.vertexShader
+          .replace(
+            "#include <common>",
+            `#include <common>
+             varying vec3 vEdgeNormal;
+             varying vec3 vEdgeViewPos;`,
+          )
+          .replace(
+            "#include <project_vertex>",
+            `#include <project_vertex>
+             vEdgeNormal  = normalize(normalMatrix * normal);
+             vEdgeViewPos = -mvPosition.xyz;`,
+          );
+        shader.fragmentShader = shader.fragmentShader
+          .replace(
+            "#include <common>",
+            `#include <common>
+             uniform float uEdgeTime;
+             varying vec3 vEdgeNormal;
+             varying vec3 vEdgeViewPos;`,
+          )
+          .replace(
+            "#include <output_fragment>",
+            `#include <output_fragment>
+             {
+               vec3 N = normalize(vEdgeNormal);
+               vec3 V = normalize(vEdgeViewPos);
+               float f = pow(1.0 - abs(dot(N, V)), 3.0);
+               float hue = f * 8.0 + uEdgeTime * 0.6;
+               vec3 rainbow = vec3(
+                 sin(hue           ) * 0.5 + 0.5,
+                 sin(hue + 2.0944  ) * 0.5 + 0.5,
+                 sin(hue + 4.18879 ) * 0.5 + 0.5
+               );
+               gl_FragColor.rgb += rainbow * f * 0.28;
+             }`,
+          );
+      };
+    }
 
     this.diamond = new THREE.Mesh(geom, mat);
     this.diamond.rotation.x = -0.18;
     this.scene.add(this.diamond);
   }
 
-  // Cached brilliant-cut geometry. Keyed by tessellation N so mobile and
-  // desktop each get one bake. The returned BufferGeometry is a shared
-  // instance — destroy() must not dispose it (guarded by _sharedGeom).
+  // Cached brilliant-cut geometry. Ring layers give proper diamond
+  // proportions (table → crown → wide girdle → pavilion → culet). Each
+  // triangle carries its own vertex copies so computeVertexNormals()
+  // produces per-face normals — every facet is a hard, planar reflector
+  // instead of a smooth-blurred surface. Adjacent layers alternate a
+  // half-step angular offset, which turns each ring band into N zig-zag
+  // triangular facets (the "star/bezel" pattern of a real brilliant cut).
   static _getBrilliantGeometry(N) {
     if (!Philosophy._geomCache) Philosophy._geomCache = new Map();
     let g = Philosophy._geomCache.get(N);
     if (g) return g;
 
+    const halfStep = Math.PI / N;
+    const layers = [
+      [ 0.62,  0.00,  0        ],   // table center (fans out to table edge)
+      [ 0.62,  0.40,  0        ],   // table edge (flat top disc)
+      [ 0.40,  0.70,  halfStep ],   // upper crown ring — offset creates star facets
+      [ 0.08,  1.00,  0        ],   // girdle (widest)
+      [-0.22,  0.88,  halfStep ],   // upper pavilion ring — offset again
+      [-0.72,  0.42,  0        ],   // lower pavilion
+      [-1.08,  0.00,  0        ],   // culet point
+    ];
+
+    // Materialize each layer as an array of [x,y,z] verts (single vert if r=0)
+    const rings = layers.map(([y, r, a]) => {
+      if (r === 0) return [[0, y, 0]];
+      const verts = [];
+      for (let i = 0; i < N; i++) {
+        const th = (i / N) * Math.PI * 2 + a;
+        verts.push([Math.cos(th) * r, y, Math.sin(th) * r]);
+      }
+      return verts;
+    });
+
     const positions = [];
     const indices   = [];
-    const halfStep  = Math.PI / N;
+    const pushTri = (a, b, c) => {
+      const base = positions.length / 3;
+      positions.push(a[0], a[1], a[2],
+                     b[0], b[1], b[2],
+                     c[0], c[1], c[2]);
+      indices.push(base, base + 1, base + 2);
+    };
 
-    const layers = [
-      [ 0.62,  0.00,  0        ],
-      [ 0.62,  0.40,  0        ],
-      [ 0.40,  0.70,  halfStep ],
-      [ 0.08,  1.00,  0        ],
-      [-0.22,  0.88,  halfStep ],
-      [-0.72,  0.42,  0        ],
-      [-1.08,  0.00,  0        ],
-    ];
-    const ringStarts = [];
-    for (const [y, r, a] of layers) {
-      ringStarts.push(positions.length / 3);
-      if (r === 0) positions.push(0, y, 0);
-      else for (let i = 0; i < N; i++) {
-        const th = (i / N) * Math.PI * 2 + a;
-        positions.push(Math.cos(th) * r, y, Math.sin(th) * r);
-      }
-    }
     for (let li = 0; li < layers.length - 1; li++) {
-      const [, r1] = layers[li];
-      const [, r2] = layers[li + 1];
-      const s1 = ringStarts[li];
-      const s2 = ringStarts[li + 1];
-      if (r1 === 0 && r2 > 0) {
+      const r1 = rings[li];
+      const r2 = rings[li + 1];
+      if (r1.length === 1 && r2.length > 1) {
+        // Fan from top center → outer ring (upward-facing table)
+        const c = r1[0];
         for (let i = 0; i < N; i++) {
-          const nxt = (i + 1) % N;
-          indices.push(s1, s2 + i, s2 + nxt);
+          const j = (i + 1) % N;
+          pushTri(c, r2[i], r2[j]);
         }
-      } else if (r1 > 0 && r2 === 0) {
+      } else if (r1.length > 1 && r2.length === 1) {
+        // Fan from outer ring → bottom center (culet)
+        const c = r2[0];
         for (let i = 0; i < N; i++) {
-          const nxt = (i + 1) % N;
-          indices.push(s1 + i, s1 + nxt, s2);
+          const j = (i + 1) % N;
+          pushTri(r1[i], r1[j], c);
         }
       } else {
+        // Two rings — connect as quad-band; per-face verts give per-facet flat shading
         for (let i = 0; i < N; i++) {
-          const nxt = (i + 1) % N;
-          indices.push(s1 + i,   s1 + nxt, s2 + i);
-          indices.push(s1 + nxt, s2 + nxt, s2 + i);
+          const j = (i + 1) % N;
+          pushTri(r1[i], r1[j], r2[i]);
+          pushTri(r1[j], r2[j], r2[i]);
         }
       }
     }
+
     g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
     g.setIndex(indices);
-    // Bake the visual scale + normals once so the mesh factory can use the
-    // shared buffer directly without further processing per instance.
     g.scale(0.92, 1.06, 0.92);
     g.computeVertexNormals();
     Philosophy._geomCache.set(N, g);
@@ -1307,6 +1525,20 @@ export class Philosophy {
       const scaleTarget = narrow ? target.scale * 0.42 : target.scale;
       const curS = this.diamond.scale.x + (scaleTarget - this.diamond.scale.x) * k;
       this.diamond.scale.setScalar(curS);
+
+      // Caustic halo — trail the diamond in screen-space so the glow reads
+      // as an emanation from the gem itself, not a fixed backdrop element
+      if (this._causticPlane) {
+        this._causticPlane.position.x = this.diamond.position.x;
+        this._causticPlane.position.y = this.diamond.position.y;
+        this._causticPlane.scale.setScalar(Math.max(curS, 0.4) * 1.35);
+        this._causticPlane.material.uniforms.uTime.value = this._elapsed;
+      }
+
+      // Facet-edge rainbow cycle
+      if (this.diamond.material.userData.uEdgeTime) {
+        this.diamond.material.userData.uEdgeTime.value = this._elapsed;
+      }
 
       // Hero watermark plane — visible on the intro, fades as the user
       // scrolls into the manifesto so it doesn't compete with the stanzas.
