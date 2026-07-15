@@ -1,1 +1,0 @@
-var e=`/assets/holm%20new%20logo-Bip0vyGu.svg`;export{e as t};
