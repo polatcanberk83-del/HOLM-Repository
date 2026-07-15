@@ -6,6 +6,8 @@ import { RoomEnvironment }  from "three/examples/jsm/environments/RoomEnvironmen
 import { EffectComposer }   from "three/examples/jsm/postprocessing/EffectComposer.js";
 import { RenderPass }       from "three/examples/jsm/postprocessing/RenderPass.js";
 import { OutputPass }       from "three/examples/jsm/postprocessing/OutputPass.js";
+import { CSS3DRenderer,
+         CSS3DObject }      from "three/examples/jsm/renderers/CSS3DRenderer.js";
 import { PosterWave }       from "./posterWave.js";
 import logoUrl              from "./assets/holm new logo.svg?url";
 import "./about.css";
@@ -20,6 +22,26 @@ _gltfLoader.setDRACOLoader(_dracoLoader);
 const CAM_LERP        = 0.09;   // per-frame lerp toward beat target (@60fps)
 const IDLE_DRIFT_AMP  = 0.04;   // camera micro-drift so the still scene feels alive
 const IDLE_DRIFT_HZ   = 0.11;
+
+// ─── Manual placement for the CSS3D screen overlay ──────────────────
+// Locked to *this specific* laptop model. The mesh-selection heuristic
+// keeps guessing between the inner display panel and the outer bezel
+// face, so we bypass it and set the exact world-space rectangle the
+// DOM overlay should sit on. Adjust these until it visually snaps to
+// the laptop's screen surface.
+const SCREEN = {
+  centerX: 0.003,     // world X — nudged tiny bit right
+  centerY: 0.140,     // world Y
+  centerZ: -0.111,    // world Z (front surface, ~ bbox_centre + thin/2)
+  width:   0.333,     // world width
+  height:  0.220,     // world height
+  // Real laptop screens lean back a bit — normal points up + forward,
+  // not straight forward. This tilts the DOM overlay to match.
+  tiltRad: 0.14,      // ~8° back. Increase to lean more, decrease for less.
+  offsetX: 0.000,
+  offsetY: 0.000,
+  offsetZ: 0.000,
+};
 
 // ─── Content — the 5 fasets ─────────────────────────────────────────
 // The whole page rebuilt around the diamond motif (no more "patience").
@@ -161,13 +183,14 @@ export class About {
   // ── Public API ──────────────────────────────────────────────────
   init() {
     this._createDOM();
+    // Mobile skips the entire WebGL + CSS3D stack. The mobile article
+    // in the DOM below is what the reader actually gets — pure editorial,
+    // fast to boot, easy on phone GPUs.
+    if (this._isMobile) return;
     this._createThree();
     this._buildScene();
     this._bindScroll();
     this._bindResize();
-    this._observeBlocks();
-    this._bindCtaMagnetic();
-    this._mountPosterWaves();
     this._startLoop();
   }
 
@@ -227,174 +250,115 @@ export class About {
   }
 
   // ── DOM ─────────────────────────────────────────────────────────
+  // Two content trees, one source of truth: the CSS3D screen used on
+  // desktop (text projected onto the laptop display) and a mobile-only
+  // fallback article that sits directly in the page flow.
   _createDOM() {
     const container = document.createElement("div");
     container.className = "holm-about";
     if (this._reducedMotion) container.classList.add("is-reduced-motion");
+    if (this._isMobile)      container.classList.add("is-mobile");
 
-    const beatsHtml = BEATS.map((beat, i) => {
+    // One section template, rendered into both content trees. Parent
+    // class + CSS media queries handle desktop vs mobile styling.
+    const sectionHtml = (beat) => {
       const linesHtml = beat.lines.map((ln) => {
-        const cls = ln.head
-          ? "holm-about__line holm-about__line--head"
-          : "holm-about__line";
-        return `<div class="${cls}">${splitLineToChars(ln.text)}</div>`;
+        const cls = ln.head ? "holm-about__scr-head" : "holm-about__scr-body";
+        return `<div class="${cls}">${ln.text}</div>`;
       }).join("");
-
-      // Portrait slot only on the intro beat
       const portraitHtml = beat.portrait
-        ? `<div class="holm-about__portrait" aria-hidden="true">
-             <img src="/portrait.png"
-                  alt=""
-                  onerror="this.style.display='none'" />
+        ? `<div class="holm-about__scr-portrait" aria-hidden="true">
+             <img src="/portrait.png" alt="" onerror="this.style.display='none'" />
            </div>`
         : "";
-
-      // Selected-work image — a subtly waving poster. CSS handles the
-      // wave for now (transform + filter); a WebGL shader upgrade is
-      // queued for the next iteration.
       const workImageHtml = beat.workImage
-        ? `<a class="holm-about__work-image"
+        ? `<a class="holm-about__scr-work"
               href="${beat.workLink?.href || "#"}"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="Open ${beat.eyebrow} project in a new tab">
-             <span class="holm-about__work-image-frame">
-               <img src="${beat.workImage}"
-                    alt=""
-                    loading="lazy"
-                    onerror="this.closest('.holm-about__work-image').classList.add('is-empty')" />
-             </span>
+              target="_blank" rel="noopener noreferrer">
+             <img src="${beat.workImage}" alt="Orwell — Awwwards Honorable Mention" loading="lazy" />
            </a>`
         : "";
-
-      const workLinkHtml = beat.workLink && !beat.workImage
-        ? `<a class="holm-about__work-link"
+      const workLinkHtml = beat.workLink
+        ? `<a class="holm-about__scr-link"
               href="${beat.workLink.href}"
-              target="_blank"
-              rel="noopener noreferrer"
-              data-hover-roll>${beat.workLink.label}</a>`
-        : beat.workLink
-          ? `<a class="holm-about__work-link"
-                href="${beat.workLink.href}"
-                target="_blank"
-                rel="noopener noreferrer"
-                data-hover-roll>${beat.workLink.label}</a>`
-          : "";
-
-      const ctaHtml = beat.ctaLabel
-        ? `<a class="holm-about__cta"
-              href="${beat.ctaHref}"
-              aria-label="${beat.ctaLabel}"
-              data-hover-roll>${beat.ctaLabel}</a>`
+              target="_blank" rel="noopener noreferrer">${beat.workLink.label}</a>`
         : "";
-
-      const compactClass = beat.compact ? " is-compact" : "";
-
-      // Each beat gets three tear seeds (one per layer of the stack)
-      // and a distinct rotation/drift phase so the sheets read as three
-      // separate physical papers piled together — not identical clones.
-      const rot     = ((i % 2 === 0 ? -1 : 1) * (0.9 + (i * 0.4) % 1.3)).toFixed(2);
-      const seed    = (7  + i * 11) % 97;
-      const seedB1  = (23 + i * 17) % 97;
-      const seedB2  = (41 + i * 13) % 97;
-      // Idle-drift phase per paper — animation-delay is negative so drift
-      // starts mid-cycle and papers aren't in sync
-      const drift   = (-2.6 * i).toFixed(1);
-
+      const ctaHtml = beat.ctaLabel
+        ? `<a class="holm-about__scr-cta"
+              href="${beat.ctaHref}"
+              aria-label="${beat.ctaLabel}">${beat.ctaLabel}</a>`
+        : "";
       return `
-        <section class="holm-about__beat${compactClass}"
-                 data-beat="${i}"
-                 data-side="${beat.side}"
-                 data-final="${!!beat.ctaLabel}">
-          <div class="holm-about__stanza">
-            ${portraitHtml}
-            ${workImageHtml}
-            <div class="holm-about__paper"
-                 style="--paper-rot:${rot}deg; --paper-drift-delay:${drift}s">
-              <!-- Two backing sheets peek out behind the main sheet — the
-                   torn edges + slight offset read as a real paper pile -->
-              <div class="holm-about__paper-sheet holm-about__paper-sheet--back-2"
-                   style="filter: url(#holm-paper-tear-${seedB2})"></div>
-              <div class="holm-about__paper-sheet holm-about__paper-sheet--back-1"
-                   style="filter: url(#holm-paper-tear-${seedB1})"></div>
-              <div class="holm-about__paper-sheet holm-about__paper-sheet--main"
-                   style="filter: url(#holm-paper-tear-${seed})"></div>
-              <!-- Corner curl — a torn triangle that reads as a peeled edge -->
-              <div class="holm-about__paper-curl" aria-hidden="true"></div>
-              <div class="holm-about__paper-body">
-                <span class="holm-about__eyebrow">${beat.eyebrow}</span>
-                ${linesHtml}
-                ${workLinkHtml}
-              </div>
-            </div>
-            ${ctaHtml}
-          </div>
+        <section class="holm-about__scr-section">
+          ${portraitHtml}
+          <span class="holm-about__scr-eyebrow">${beat.eyebrow}</span>
+          ${linesHtml}
+          ${workImageHtml}
+          ${workLinkHtml}
+          ${ctaHtml}
         </section>
       `;
+    };
+    const screenSectionsHtml = BEATS.map(sectionHtml).join("");
+
+    // Screen-reader-only version so the WebGL content is still discoverable
+    const srHtml = BEATS.map((beat) => {
+      const lines = beat.lines.map((l) => `<p>${l.text}</p>`).join("");
+      return `<section><h2>${beat.eyebrow}</h2>${lines}</section>`;
     }).join("");
 
-    // A tear filter per seed used above (3 seeds × N beats). Rather than
-    // enumerate manually, just emit one filter per unique seed we used.
-    const seenSeeds = new Set();
-    const tearFiltersHtml = BEATS.map((_b, i) => {
-      const seeds = [(7 + i * 11) % 97, (23 + i * 17) % 97, (41 + i * 13) % 97];
-      return seeds.map((seed) => {
-        if (seenSeeds.has(seed)) return "";
-        seenSeeds.add(seed);
-        return `
-          <filter id="holm-paper-tear-${seed}"
-                  x="-8%" y="-10%" width="116%" height="120%">
-            <feTurbulence type="fractalNoise"
-                          baseFrequency="0.012 0.018"
-                          numOctaves="4"
-                          seed="${seed}"
-                          result="noise"/>
-            <feDisplacementMap in="SourceGraphic" in2="noise"
-                               scale="22" xChannelSelector="R" yChannelSelector="G"/>
-          </filter>
-        `;
-      }).join("");
-    }).join("");
+    // The screen DOM lives on its own element that we'll wrap in a
+    // CSS3DObject — fixed pixel size, aspect ~16:10 to match a laptop
+    // display. CSS3DObject scales this down to world size.
+    this._screenEl = document.createElement("div");
+    this._screenEl.className = "holm-about__screen";
+    this._screenEl.innerHTML = `
+      <div class="holm-about__screen-scroll">
+        ${screenSectionsHtml}
+      </div>
+    `;
+
+    // Mobile fallback article — reuses the same section renderer but
+    // shows in normal page flow when the CSS3D screen would be too small
+    // to read. Desktop hides it via CSS.
+    const mobileArticleHtml = `
+      <article class="holm-about__mobile-article">
+        ${BEATS.map(sectionHtml).join("")}
+      </article>
+    `;
 
     container.innerHTML = `
       <canvas class="holm-about__canvas" aria-hidden="true"></canvas>
       <div class="holm-about__vignette" aria-hidden="true"></div>
 
-      <!-- Global SVG defs — torn-paper filters (one seed per beat) -->
-      <svg class="holm-about__svg-defs" width="0" height="0" aria-hidden="true">
-        <defs>${tearFiltersHtml}</defs>
-      </svg>
-
       <a class="holm-about__brand" href="/" aria-label="HOLM — home">
         <img src="${logoUrl}" alt="HOLM" />
       </a>
 
-      <section class="holm-about__intro" aria-hidden="true"></section>
-
       <main id="about-content"
-            class="holm-about__beats"
+            class="holm-about__scroll"
             tabindex="-1"
-            aria-label="HOLM about — five-part introduction">
-        ${beatsHtml}
+            aria-label="HOLM about — the article is displayed on the 3D laptop screen">
+        <!-- Desktop: empty spacers drive scroll length for camera + on-screen
+             text scroll. Mobile: the same scroll length carries a real
+             editorial article below (mobile-article overlays the spacers). -->
+        <div class="holm-about__spacer"></div>
+        <div class="holm-about__spacer"></div>
+        <div class="holm-about__spacer"></div>
+        <div class="holm-about__spacer"></div>
+        <div class="holm-about__spacer"></div>
+        <div class="holm-about__spacer"></div>
+        ${mobileArticleHtml}
       </main>
+
+      <!-- Plain text version for screen readers -->
+      <div class="sr-only">${srHtml}</div>
     `;
     document.body.appendChild(container);
 
     this.container = container;
     this.canvas    = container.querySelector(".holm-about__canvas");
-    this.blocks    = [...container.querySelectorAll(".holm-about__beat")];
-
-    // Track DOM anchors → beat indices for weighted blend
-    this._beatEls = this.blocks.map((el) => ({
-      el,
-      beat: BEATS[parseInt(el.dataset.beat, 10)],
-    }));
-
-    // Every animatable element starts visible — the cylinder-scroll
-    // handler in the render loop takes over per-element opacity/tilt
-    // based on their Y position in the viewport. No reveal cascade.
-    const allChars = container.querySelectorAll(".holm-about__char");
-    gsap.set(allChars, { yPercent: 0, opacity: 1 });
+    this._screenScrollEl = this._screenEl.querySelector(".holm-about__screen-scroll");
   }
 
   // ── Three.js ────────────────────────────────────────────────────
@@ -438,6 +402,24 @@ export class About {
     this._composer.setSize(window.innerWidth, window.innerHeight);
     this._composer.addPass(new RenderPass(this.scene, this.camera));
     this._composer.addPass(new OutputPass());
+
+    // ── CSS3D renderer — desktop-only. Mobile uses the DOM fallback
+    // article instead of trying to render readable text onto a phone-
+    // sized laptop screen.
+    if (!this._isMobile) {
+      this._css3d = new CSS3DRenderer();
+      this._css3d.setSize(window.innerWidth, window.innerHeight);
+      Object.assign(this._css3d.domElement.style, {
+        position: "fixed",
+        top:      "0",
+        left:     "0",
+        width:    "100%",
+        height:   "100%",
+        pointerEvents: "none",
+        zIndex:   "3",
+      });
+      this.container.appendChild(this._css3d.domElement);
+    }
   }
 
   // ── Workbench scene — clean desk + laptop hero prop ──────────────
@@ -533,7 +515,7 @@ export class About {
       (gltf) => {
         const root = gltf.scene;
 
-        // Rescale so the laptop's longest side is ~0.33 m (real laptop width)
+        // Rescale so the laptop's longest side is ~0.36 m (real laptop width)
         const box  = new THREE.Box3().setFromObject(root);
         const size = new THREE.Vector3();
         box.getSize(size);
@@ -548,27 +530,187 @@ export class About {
         const box2 = new THREE.Box3().setFromObject(root);
         const centre = new THREE.Vector3();
         box2.getCenter(centre);
-        const yOffset = -box2.min.y;                // lift base to y=0
+        const yOffset = -box2.min.y;
         root.position.set(-centre.x, yOffset, -centre.z);
 
-        // Shadows + shared material tweak — the model may ship with
-        // unusual roughness; leave it, just enable shadow casting.
+        // Shadows + collect meshes so we can find the screen surface
+        const meshes = [];
         root.traverse((c) => {
           if (c.isMesh) {
             c.castShadow    = !this._isMobile;
             c.receiveShadow = !this._isMobile;
+            meshes.push(c);
           }
         });
 
         this.scene.add(root);
         this._props.laptop = root;
         console.log("[about] laptop loaded — scale:", scale.toFixed(3));
+
+        // Find the screen mesh + attach the CSS3D content
+        this._mountScreenOnLaptop(root, meshes);
       },
       undefined,
       (err) => {
         console.error("[about] laptop failed to load", err);
       },
     );
+  }
+
+  // ── Screen mesh discovery + CSS3D content placement ──────────────
+  // Walks the laptop meshes to find the largest thin flat rectangle
+  // sitting high in Y — that's the display. Brightens its material so
+  // it reads as "on", then places a CSS3DObject over it holding all the
+  // page's content.
+  _mountScreenOnLaptop(root, meshes) {
+    root.updateMatrixWorld(true);
+    // Get the laptop's world bounding box so we can score meshes by how
+    // high they sit relative to the whole laptop — the screen is always
+    // in the top half of the open laptop.
+    const rootBox = new THREE.Box3().setFromObject(root);
+    const rootBottom = rootBox.min.y;
+    const rootTop    = rootBox.max.y;
+    const rootHeight = Math.max(1e-6, rootTop - rootBottom);
+
+    let screenMesh = null;
+    let bestScore  = -Infinity;
+
+    console.log("[about] laptop meshes:");
+    for (const c of meshes) {
+      const g = c.geometry;
+      if (!g) continue;
+
+      // World-space bounding box + centre + size — this handles the
+      // mesh's own transform + parent transforms + scale in one shot.
+      const wbox    = new THREE.Box3().setFromObject(c);
+      const wsize   = new THREE.Vector3(); wbox.getSize(wsize);
+      const wcenter = new THREE.Vector3(); wbox.getCenter(wcenter);
+
+      const dims = [wsize.x, wsize.y, wsize.z].sort((a, b) => a - b);
+      const thin = dims[0], mid = dims[1], wide = dims[2];
+      const heightRatio = (wcenter.y - rootBottom) / rootHeight;
+
+      console.log(
+        `  ${c.name || "(unnamed)"} · size ${wsize.x.toFixed(3)}×${wsize.y.toFixed(3)}×${wsize.z.toFixed(3)}`
+        + ` · centerY ${wcenter.y.toFixed(3)} · h-ratio ${heightRatio.toFixed(2)}`,
+      );
+
+      // Filter: reasonable-size flat rectangle, aspect roughly panel-like
+      if (wide < 0.15) continue;
+      // Thin filter — the visible display panel is thin relative to its
+      // face, but "thin" for a modelled laptop screen is up to ~10-15% of
+      // its width (accounting for bezel + lid thickness). 0.22 is roomy.
+      if (thin > 0.22 * wide) continue;
+      const aspect = wide / mid;
+      if (aspect < 1.15 || aspect > 2.6) continue;
+      // Reject anything in the bottom half — that's the base + keyboard.
+      if (heightRatio < 0.45) continue;
+
+      // Score: prefer the LARGEST face in the upper half. That's the
+      // outer bezel-inclusive screen face, which matches the perimeter
+      // the viewer actually reads as "the screen".
+      const area  = wide * mid;
+      const score = heightRatio * 100 + area * 10000;
+      if (score > bestScore) {
+        bestScore  = score;
+        screenMesh = c;
+      }
+    }
+
+    if (!screenMesh) {
+      console.warn("[about] screen mesh not found — CSS3D content skipped");
+      return;
+    }
+    console.log("[about] → screen mesh selected:", screenMesh.name || "(unnamed)");
+
+    // On mobile we skip the CSS3D overlay entirely — the mobile-article
+    // fallback in the DOM below is what the reader actually sees. The
+    // laptop still gets its "screen on" material tweak for atmosphere.
+    if (this._isMobile) {
+      const mats0 = Array.isArray(screenMesh.material) ? screenMesh.material : [screenMesh.material];
+      mats0.forEach((m) => {
+        if (!m) return;
+        m.color?.setHex?.(0xe8e4d8);
+        if ("emissive" in m)          m.emissive?.setHex?.(0xbfb9a8);
+        if ("emissiveIntensity" in m) m.emissiveIntensity = 0.28;
+        m.roughness = 0.6;
+        m.metalness = 0.0;
+        m.needsUpdate = true;
+      });
+      this._screenMesh = screenMesh;
+      return;
+    }
+
+    // Brighten the screen material so it reads as "screen on"
+    const mats = Array.isArray(screenMesh.material) ? screenMesh.material : [screenMesh.material];
+    mats.forEach((m) => {
+      if (!m) return;
+      m.color?.setHex?.(0xf3f0e6);          // warm off-white
+      if ("emissive" in m)          m.emissive?.setHex?.(0xd8d2c2);
+      if ("emissiveIntensity" in m) m.emissiveIntensity = 0.35;
+      m.roughness   = 0.55;
+      m.metalness   = 0.0;
+      m.map         = null;
+      m.needsUpdate = true;
+    });
+
+    // Manual placement — no more mesh-selection guessing. Values live at
+    // the top of this file (SCREEN) and are tuned visually.
+    const w      = SCREEN.width;
+    const h      = SCREEN.height;
+    const center = new THREE.Vector3(
+      SCREEN.centerX + SCREEN.offsetX,
+      SCREEN.centerY + SCREEN.offsetY,
+      SCREEN.centerZ + SCREEN.offsetZ,
+    );
+    // Screen leans back: normal points up + forward (not straight +Z)
+    const t = SCREEN.tiltRad;
+    const normal = new THREE.Vector3(0, Math.sin(t), Math.cos(t));
+
+    const PIXEL_W = 1400;
+    const PIXEL_H = Math.round(PIXEL_W * (h / w));
+    this._screenEl.style.width  = `${PIXEL_W}px`;
+    this._screenEl.style.height = `${PIXEL_H}px`;
+
+    const css3dObj = new CSS3DObject(this._screenEl);
+    css3dObj.position.copy(center);
+    css3dObj.scale.setScalar(w / PIXEL_W);
+    const lookMatrix = new THREE.Matrix4();
+    lookMatrix.lookAt(center, center.clone().sub(normal), new THREE.Vector3(0, 1, 0));
+    css3dObj.quaternion.setFromRotationMatrix(lookMatrix);
+
+    this._css3dScreen = css3dObj;
+    this._screenMesh  = screenMesh;
+    this.scene.add(css3dObj);
+  }
+
+  // World-space plane normal of a mesh — derived from its axis-aligned
+  // bounding box's thinnest axis. Robust against front/back face normals
+  // cancelling out (which killed the previous averaging heuristic) as
+  // long as the mesh is close to axis-aligned in world space, which the
+  // laptop's display panel is.
+  _computeMeshWorldNormal(mesh) {
+    const wbox = new THREE.Box3().setFromObject(mesh);
+    const wsize = new THREE.Vector3();
+    wbox.getSize(wsize);
+    const center = new THREE.Vector3();
+    wbox.getCenter(center);
+
+    let normal;
+    if (wsize.x < wsize.y && wsize.x < wsize.z) {
+      normal = new THREE.Vector3(1, 0, 0);
+    } else if (wsize.y < wsize.z) {
+      normal = new THREE.Vector3(0, 1, 0);
+    } else {
+      normal = new THREE.Vector3(0, 0, 1);
+    }
+
+    // Sign convention: normal must point toward the camera (out of the
+    // screen), not into the laptop body. Flip if it points the wrong way.
+    const toCam = new THREE.Vector3().subVectors(this.camera.position, center);
+    if (normal.dot(toCam) < 0) normal.negate();
+
+    return normal;
   }
 
   // Coffee mug — sits on the right of the laptop, small but readable in the
@@ -684,6 +826,7 @@ export class About {
     }
     if (this.renderer)  this.renderer.setSize(w, h);
     if (this._composer) this._composer.setSize(w, h);
+    if (this._css3d)    this._css3d.setSize(w, h);
     this._isMobile = w < 768 || "ontouchstart" in window;
   }
 
@@ -695,15 +838,17 @@ export class About {
   //    any other transform gsap is already writing (e.g. the CTA's
   //    magnetic x/y).
   _observeBlocks() {
-    // Paper cards + portrait + poster ride the cylinder as whole units.
-    // (Text lines live inside the paper, so they move with it — putting
-    // the transform on the paper instead of each line keeps the sheet's
-    // torn edges lining up with its content.) CTA is excluded because
-    // it sits at the bottom of the final beat and shouldn't dim.
+    // Every text line, eyebrow, portrait and poster rides the cylinder on
+    // its own — each moves independently along the same vertical axis as
+    // the user scrolls, giving the "single line of scrolling type" read
+    // the user asked for. CTA is left off — it's the bottom of the last
+    // section and shouldn't fade with the rest.
     const sel = [
-      ".holm-about__paper",
+      ".holm-about__line",
+      ".holm-about__eyebrow",
       ".holm-about__portrait",
       ".holm-about__work-image",
+      ".holm-about__work-link",
     ].join(",");
     const nodes = [...this.container.querySelectorAll(sel)];
 
@@ -739,10 +884,11 @@ export class About {
     if (this._reducedMotion || !this._cylSetters) return;
     const vh     = window.innerHeight;
     const halfVh = vh * 0.5;
-    // Mobile: gentler curve so fast phone scrolling doesn't feel jarring
-    const maxAng = this._isMobile ? 42 : 65;
-    const maxZ   = this._isMobile ? 160 : 260;
-    const fade   = this._isMobile ? 0.7 : 0.85;
+    // Restrained motion — a subtle rise/tilt as elements approach viewport
+    // centre, not a dramatic tumble. "Tek bir çizgide kaysınlar."
+    const maxAng = this._isMobile ? 14 : 22;
+    const maxZ   = this._isMobile ? 60  : 110;
+    const fade   = this._isMobile ? 0.7 : 0.8;
 
     for (let i = 0; i < this._cylSetters.length; i++) {
       const s = this._cylSetters[i];
@@ -875,8 +1021,8 @@ export class About {
       this._prevTime = now;
       this._elapsed += dt;
 
-      // Camera target — weighted blend across DOM-anchored beats
-      this._computeCameraTarget(this._targetPos, this._targetLook);
+      // Camera target — scroll-driven zoom from wide to screen close-up.
+      this._computeCameraTargetFromScroll(this._targetPos, this._targetLook);
 
       // Idle micro-drift — tiny lateral sway so the still scene breathes
       if (!this._reducedMotion) {
@@ -890,19 +1036,66 @@ export class About {
       this._lookNow.lerp(this._targetLook, k);
       this.camera.lookAt(this._lookNow);
 
-      // Diamond — slow idle spin so the highlight travels around its facets
-      if (this._props.diamond && !this._reducedMotion) {
-        this._props.diamond.rotation.y += dt * 0.28;
-      }
-
-      // Cylinder scroll — reshape every text/image element based on its
-      // viewport position so the whole page curves around an invisible
-      // horizontal cylinder as the user scrolls.
-      this._updateCylinder();
+      // Screen text scroll — slide the article up inside the display as the
+      // page scrolls past the "camera has arrived" point.
+      this._updateScreenTextScroll();
 
       this._composer.render();
+      // CSS3D pass — has to run *after* the composer so the DOM overlay
+      // sits above the WebGL frame in screen-space.
+      if (this._css3d) this._css3d.render(this.scene, this.camera);
+
       this._rafId = requestAnimationFrame(tick);
     };
     this._rafId = requestAnimationFrame(tick);
+  }
+
+  // ── Camera path — one straight lerp from wide shot to screen close-up
+  //    driven by the page's scroll progress. The first 25% of scroll does
+  //    the zoom; after that the camera holds and the text scrolls on-screen.
+  _computeCameraTargetFromScroll(outPos, outLook) {
+    // Mobile: camera stays framed on the laptop as a dark backdrop; the
+    // article is rendered in the DOM overlay, so zooming into the screen
+    // does nothing but shake the backdrop.
+    if (this._isMobile) {
+      outPos.set(0.35, 0.72, 1.05);
+      outLook.set(0.05, 0.13, 0.0);
+      return;
+    }
+    const scrollT = this._scrollT ?? 0;
+    // Zoom-in eases across the opening quarter of scroll
+    const zt = Math.min(1, scrollT / 0.25);
+    const eased = zt * zt * (3 - 2 * zt);
+    outPos.set(
+      0.35 + (0.02 - 0.35) * eased,
+      0.72 + (0.16 - 0.72) * eased,
+      1.05 + (0.30 - 1.05) * eased,
+    );
+    outLook.set(
+      0.05 + (0.0  - 0.05) * eased,
+      0.13 + (0.13 - 0.13) * eased,
+      0.0  + (-0.02 - 0.0) * eased,
+    );
+  }
+
+  // ── Text scroll on the laptop screen — translates the article column
+  //    up so successive sections come into view as the user scrolls the
+  //    page past the initial camera zoom-in.
+  _updateScreenTextScroll() {
+    if (!this._screenScrollEl) return;
+    const scrollT = this._scrollT ?? 0;
+    // Reading phase runs 15% → 80% of the scroll. Under 15% is the camera
+    // zoom; the last 20% is a "hold" period where the CTA sits comfortably
+    // at the bottom of the screen so the reader has time to click without
+    // the page ending abruptly.
+    const readT = Math.max(0, Math.min(1, (scrollT - 0.15) / 0.65));
+    const total   = this._screenScrollEl.scrollHeight;
+    const parent  = this._screenScrollEl.parentElement;
+    const visH    = parent ? parent.clientHeight : 900;
+    // Nudge the final position up ~90px so the CTA doesn't kiss the bottom
+    // bezel — reads as a resting position rather than an overflow.
+    const travel  = Math.max(0, total - visH + 90);
+    const y       = travel * readT;
+    this._screenScrollEl.style.transform = `translate3d(0, ${(-y).toFixed(1)}px, 0)`;
   }
 }
