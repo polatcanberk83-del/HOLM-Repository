@@ -57,8 +57,11 @@ const post      = createPostProcessing(renderer, scene, camera, isMobile);
 // Reveal factor — starts at 0 when loader finishes, eases to 1 so the scene
 // gently "wakes up" behind the iris rather than snapping to full brightness.
 let _revealF = 0;
-const projPlane = createProjectionPlane(scene);
-const shatter   = createShatterEffect(renderer, scene, camera, isMobile);
+const projPlane = createProjectionPlane(scene, isMobile);
+// Shatter effect is desktop-only — the mobile spline geometry (extra
+// void_figure orbit points) makes the trigger window unreliable and the
+// mosaic tile pass is heavy on mobile GPUs. Cleaner to drop it entirely.
+const shatter   = isMobile ? null : createShatterEffect(renderer, scene, camera, isMobile);
 let _shatterCaptured = false;
 
 // ---------- Orbit sabitleri ----------
@@ -250,11 +253,11 @@ async function loadOneModel(def, modelIdx) {
 
     if (def.file.includes("void_figure")) {
       voidFigureModel = model;
-      shatter.setSurface(model);
+      shatter?.setSurface(model);
     }
     if (def.file.includes("hero_canvas")) {
       heroCanvasModel = model;
-      shatter.setHeroCanvas(model);
+      shatter?.setHeroCanvas(model);
     }
 
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.3, 32), _pedMat);
@@ -424,23 +427,21 @@ function tick(now = 0) {
 
   if (!isMobile) animateDust(elapsed);
 
-  // Shatter must follow the *raw* scroll position, otherwise a smoothed T
-  // interpolates through the trigger range on its own after a fast flick.
-  // Mobile also adds a +0.02 offset because the mobile camera path has
-  // more control points around void_figure (orbitN=36 vs 32), which
-  // shifts void_figure orbit start from t≈0.525 (desktop) to t≈0.508
-  // (mobile). Without the offset, SHATTER_T_ENTER=0.51 fires *inside*
-  // the void orbit — capturing void_figure instead of hero_canvas — so
-  // model 3 never appears to shatter and model 4 shatters on its own.
-  const effectT = splineT + (isMobile ? 0.02 : 0);
-  const inRange = effectT >= SHATTER_T_ENTER && effectT <= SHATTER_T_DISSOLVE_END;
-  if (inRange && !_shatterCaptured) {
-    _shatterCaptured = true;
-    shatter.capture();
+  // Shatter — desktop only. Reads raw splineT so a smoothed T can't
+  // interpolate through the trigger range on its own after a fast flick.
+  let bgDark = 0, textOpacity = 0;
+  if (shatter) {
+    const effectT = splineT;
+    const inRange = effectT >= SHATTER_T_ENTER && effectT <= SHATTER_T_DISSOLVE_END;
+    if (inRange && !_shatterCaptured) {
+      _shatterCaptured = true;
+      shatter.capture();
+    }
+    if (effectT < SHATTER_T_ENTER - 0.05) _shatterCaptured = false;
+    const upd = shatter.update(effectT);
+    bgDark      = upd.bgDark;
+    textOpacity = upd.textOpacity;
   }
-  if (effectT < SHATTER_T_ENTER - 0.05) _shatterCaptured = false;
-
-  const { bgDark, textOpacity } = shatter.update(effectT);
 
   const brightF = (1 - bgDark * 0.92) * _revealF;
   ambient.intensity   = AMBIENT_INTENSITY_BASE * brightF;

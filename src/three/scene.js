@@ -112,7 +112,7 @@ export function createScene(canvas, isMobile = false) {
 }
 
 // ---------- Projection plane (end wall) ----------
-export function createProjectionPlane(scene) {
+export function createProjectionPlane(scene, isMobile = false) {
   const mat = new THREE.ShaderMaterial({
     uniforms: { uTime: { value: 0 } },
     vertexShader: /* glsl */`
@@ -154,8 +154,14 @@ export function createProjectionPlane(scene) {
     side:        THREE.FrontSide,
   });
 
-  const plane = new THREE.Mesh(new THREE.PlaneGeometry(32, 18), mat);
-  plane.position.set(0, 4, -89.5);
+  // Mobile: portrait viewport needs a taller + wider plane so the
+  // multi-line copy overlay sits comfortably inside the glow. Desktop
+  // 32×18 is calibrated for the 16:9 orbit view.
+  const geo = isMobile
+    ? new THREE.PlaneGeometry(48, 42)
+    : new THREE.PlaneGeometry(32, 18);
+  const plane = new THREE.Mesh(geo, mat);
+  plane.position.set(0, isMobile ? 8 : 4, -89.5);
   plane.visible = false; // revealed via main.js when camera reaches the zone
   scene.add(plane);
   return plane;
