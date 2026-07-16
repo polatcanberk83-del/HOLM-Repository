@@ -23,8 +23,8 @@ const MODEL_CAPTIONS = {
   "hand.glb":        "Every brand begins like this.",
   "monument.glb":    "Something is always missing at the beginning.",
   "hero_canvas.glb": "Between sketch and masterpiece, there's patience.",
-  "void_figure.glb": "What's left unsaid shapes the rest.",
-  "arm_crystal.glb": "What was missing is held at the end.",
+  "void_figure.glb": "Sometimes what we leave out is what speaks.",
+  "arm_crystal.glb": "That's how the moment forms.",
 };
 function captionFor(filename) { return MODEL_CAPTIONS[filename] ?? ""; }
 
