@@ -422,7 +422,13 @@ function tick(now = 0) {
 
   if (!isMobile) animateDust(elapsed);
 
-  const effectT = isMobile ? splineTSmooth : splineT;
+  // Shatter must follow the *raw* scroll position on both platforms.
+  // Using splineTSmooth on mobile made the smoothed T interpolate through
+  // the 0.51-0.65 range on its own after any fast scroll → the effect
+  // played automatically, and it also missed the correct trigger point
+  // relative to what the user was actually looking at. Raw splineT keeps
+  // the shatter locked to the user's actual scroll position.
+  const effectT = splineT;
   if (effectT >= SHATTER_T_ENTER && !_shatterCaptured) {
     _shatterCaptured = true;
     shatter.capture();
