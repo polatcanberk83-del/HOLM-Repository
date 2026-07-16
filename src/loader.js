@@ -330,10 +330,24 @@ export class Loader {
     const overlay = document.createElement("div");
     overlay.className = "holm-loader";
     overlay.style.setProperty("--holm-loader-bg", OVERLAY_BG);
+    // Odometer counter: three column strips (hundreds/tens/ones), each
+    // holding a stacked 0-9 list. The active digit is exposed by sliding
+    // the strip vertically via translateY. Leading zeros stay dimmed so
+    // "007", "042", "100" read as an instrument display, not typos.
+    const digitStack = () => `
+      <span class="holm-loader__digit">
+        <span class="holm-loader__strip">
+          ${[0,1,2,3,4,5,6,7,8,9].map(d => `<span>${d}</span>`).join("")}
+        </span>
+      </span>`;
+
     overlay.innerHTML = `
       <div class="holm-loader__frame">
         <div class="holm-loader__counter">
-          <span class="holm-loader__num">0</span><span class="holm-loader__pct">%</span>
+          <span class="holm-loader__num" aria-hidden="true">
+            ${digitStack()}${digitStack()}${digitStack()}
+          </span>
+          <span class="holm-loader__pct">%</span>
         </div>
       </div>
     `;
@@ -342,6 +356,10 @@ export class Loader {
     this.overlay   = overlay;
     this.frameEl   = overlay.querySelector(".holm-loader__frame");
     this.counterEl = overlay.querySelector(".holm-loader__num");
+    // Cache the three strips so the tick loop only measures the DOM once.
+    const digits    = overlay.querySelectorAll(".holm-loader__digit");
+    this._digitEls  = [digits[0], digits[1], digits[2]];
+    this._stripEls  = [...overlay.querySelectorAll(".holm-loader__strip")];
   }
 
   _createDiamond() {
@@ -412,8 +430,27 @@ export class Loader {
       // Time-gate: never advance faster than elapsed / MIN_DURATION
       const timeGate = Math.min(elapsed / MIN_DURATION, 1);
       const shown    = Math.min(this._displayProgress.value, timeGate);
-      const pct      = Math.floor(shown * 100);
-      if (this.counterEl) this.counterEl.textContent = String(pct);
+      const pct      = Math.min(shown * 100, 100);   // continuous float, 0..100
+
+      // Odometer: each strip's translateY is continuous — carry from ones
+      // to tens rolls smoothly instead of snapping. Stack height comes from
+      // the digit element itself so the math scales with any font-size.
+      if (this._stripEls && this._stripEls.length === 3) {
+        const dH = this._digitEls[0].offsetHeight || 0;
+        if (dH > 0) {
+          const h = Math.min(pct / 100, 1);           // 0..1
+          const t = (pct / 10) % 10;                  // 0..10 (continuous)
+          const o = pct % 10;                         // 0..10 (continuous)
+          this._stripEls[0].style.transform = `translate3d(0, ${-h * dH}px, 0)`;
+          this._stripEls[1].style.transform = `translate3d(0, ${-t * dH}px, 0)`;
+          this._stripEls[2].style.transform = `translate3d(0, ${-o * dH}px, 0)`;
+          // Leading-zero dimming: brighten each column the moment its
+          // strip starts sliding away from 0, not only when a fresh
+          // integer digit fully lands. Prevents a "pop" at 99→100.
+          this._digitEls[0].dataset.dim = h > 0.02 ? "0" : "1";
+          this._digitEls[1].dataset.dim = pct >= 10 ? "0" : "1";
+        }
+      }
 
       // Diamond animation — slow gleaming spin, subtle wobble
       // Continuous 360° spin — line-art wireframe rotates on Y only for clarity
