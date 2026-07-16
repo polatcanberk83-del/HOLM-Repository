@@ -533,24 +533,40 @@ async function boot() {
         },
       );
 
+      let _teaserHidden = false;
       const hideTeaser = () => {
+        if (_teaserHidden) return;
+        _teaserHidden = true;
         gsap.to(teaser, {
           opacity: 0,
           duration: 0.8,
           ease: "power2.out",
           onComplete: () => teaser.setAttribute("aria-hidden", "true"),
         });
-        window.removeEventListener("wheel",     onScrollHide, { passive: true });
-        window.removeEventListener("touchmove", onScrollHide, { passive: true });
+        lenis.off("scroll", onLenisScrollHide);
+        window.removeEventListener("wheel",     onScrollHide);
+        window.removeEventListener("touchmove", onScrollHide);
+        window.removeEventListener("keydown",   onKeyScrollHide);
         clearTimeout(dwellTimer);
       };
-      const onScrollHide = () => {
-        // Ignore taps and jitter — only real scroll intent hides the teaser
-        if (window.scrollY > 20) hideTeaser();
+      // Lenis is the source of truth for scroll — smoothed scroll, keyboard,
+      // programmatic all funnel through it. A tiny threshold rejects the
+      // sub-pixel jitter that fires on load without gating out real intent.
+      const onLenisScrollHide = ({ scroll }) => {
+        if (scroll > 4) hideTeaser();
+      };
+      const onScrollHide = () => hideTeaser();
+      const onKeyScrollHide = (e) => {
+        // Arrow keys / space / page-up-down / home / end all scroll the page
+        if (["ArrowDown","ArrowUp","PageDown","PageUp","End","Home"," "].includes(e.key)) {
+          hideTeaser();
+        }
       };
       const dwellTimer = setTimeout(hideTeaser, 7000);
+      lenis.on("scroll", onLenisScrollHide);
       window.addEventListener("wheel",     onScrollHide, { passive: true });
       window.addEventListener("touchmove", onScrollHide, { passive: true });
+      window.addEventListener("keydown",   onKeyScrollHide);
     }
   };
 
