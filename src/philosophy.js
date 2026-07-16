@@ -18,7 +18,11 @@ const SCROLL_TILT_MAX    = 0.18;       // rad — X tilt at scroll = 1
 // hit is invisible but the frame-rate win is massive.
 const _MOBILE_HINT       = typeof window !== "undefined"
   && (window.innerWidth < 768 || "ontouchstart" in window);
-const FLUID_RES_SCALE   = _MOBILE_HINT ? 0.22 : 0.5;
+// Fluid backdrop is the user-facing surface — mobile keeps 0.42 so the
+// gradient reads smooth. The diamond-side cuts (no bloom / no caustic /
+// no watermark / no dispersion) more than compensate for the fill-rate
+// cost of running the fluid at a higher resolution.
+const FLUID_RES_SCALE   = _MOBILE_HINT ? 0.42 : 0.5;
 const FLUID_BRUSH_SIZE  = 22.0;
 const FLUID_BRUSH_STR   = 0.30;
 const FLUID_DECAY       = 0.985;

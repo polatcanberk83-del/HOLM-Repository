@@ -30,7 +30,7 @@ function captionFor(filename) { return MODEL_CAPTIONS[filename] ?? ""; }
 
 const MODEL_DEFS = [
   { file: "/models/hand.glb",        z:   0, scale: 3 },
-  { file: "/models/monument.glb",    z: -12, scale: 0.57 },
+  { file: "/models/monument.glb",    z: -12, scale: 0.456 },
   { file: "/models/hero_canvas.glb", z: -24, scale: 3 },
   { file: "/models/void_figure.glb", z: -36, orbitN: isMobile ? 36 : 32 },
   { file: "/models/arm_crystal.glb", z: -48 },
