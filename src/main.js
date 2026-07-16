@@ -506,6 +506,16 @@ async function boot() {
       delay: 2.4,
       ease: "power2.out",
     });
+    // Wordmark starts hidden in CSS so it doesn't flash above the loader
+    // overlay on first paint — fade it in alongside the iris reveal.
+    if (wordmarkEl) {
+      gsap.to(wordmarkEl, {
+        opacity: 0.85,
+        duration: 1.2,
+        delay: 1.6,
+        ease: "power2.out",
+      });
+    }
 
     // Landing teaser — 2-line "what is HOLM" that appears in the first
     // few seconds after iris reveal so a visitor who doesn't scroll still

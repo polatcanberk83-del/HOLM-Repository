@@ -156,12 +156,14 @@
       }
 
       /* ── Wordmark ─────────────────────────────────────────────────── */
+      /* Hidden by default so it doesn't flash above the loader overlay
+         during the initial DOM paint. main.js fades it in on scene reveal. */
       .wordmark {
         position: fixed;
         top: 5vh;
         left: 5vw;
         z-index: 3;
-        opacity: 0.85;
+        opacity: 0;
       }
       .wm-logo {
         display: block;
@@ -171,7 +173,11 @@
       }
 
       /* ── Book a Call button ──────────────────────────────────────── */
+      /* Hidden by default — main.js's Menu takes over the top-right slot
+         and permanently hides this button. Keeping it hidden in the base
+         stylesheet prevents a flash of the standalone button on load. */
       #book-call {
+        display: none;
         position: fixed;
         top: 5vh;
         right: 5vw;
