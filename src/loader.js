@@ -360,6 +360,7 @@ export class Loader {
 
     this.diamond = new THREE.LineSegments(edges, mat);
     this.diamond.rotation.x = -0.28;
+    this.diamond.scale.setScalar(1 / 3);   // 3× smaller — jewel accent, not a hero element
     this.scene.add(this.diamond);
     solid.dispose();
 

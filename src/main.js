@@ -251,15 +251,6 @@ async function loadOneModel(def, modelIdx) {
 
     scene.add(model);
 
-    if (def.file.includes("void_figure")) {
-      voidFigureModel = model;
-      shatter?.setSurface(model);
-    }
-    if (def.file.includes("hero_canvas")) {
-      heroCanvasModel = model;
-      shatter?.setHeroCanvas(model);
-    }
-
     const ped = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, 0.3, 32), _pedMat);
     ped.position.set(0, 0.15, def.z);
     ped.castShadow = ped.receiveShadow = true;
@@ -268,6 +259,18 @@ async function loadOneModel(def, modelIdx) {
     const halo = createHalo();
     halo.position.set(0, 0.02, def.z);
     scene.add(halo);
+
+    // Register model + its "stage" (pedestal + halo) with the shatter
+    // effect so they can vanish behind the freeze frame as a single unit.
+    if (def.file.includes("void_figure")) {
+      voidFigureModel = model;
+      shatter?.setSurface(model);
+      shatter?.setVoidExtras([ped, halo]);
+    }
+    if (def.file.includes("hero_canvas")) {
+      heroCanvasModel = model;
+      shatter?.setHeroCanvas(model, [ped, halo]);
+    }
 
     const keyLight = new THREE.PointLight(0xd0e8ff, MODEL_KEY_INTENSITIES[modelIdx] ?? 500, 16, 2);
     keyLight.position.set(0, 6.5, def.z);

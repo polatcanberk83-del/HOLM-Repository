@@ -123,10 +123,11 @@ void main() {
   scene.add(mesh);
 
   // ── Per-instance position arrays ──────────────────────────────────────────
-  const gridPos    = new Array(N);
-  const scatterPos = new Array(N);
-  const gatherPos  = new Array(N);
-  const scatterRot = new Float32Array(N * 3);
+  const gridPos     = new Array(N);
+  const scatterPos  = new Array(N);
+  const gatherPos   = new Array(N);
+  const scatterDir  = new Array(N).fill(null).map(() => new THREE.Vector3());
+  const scatterRot  = new Float32Array(N * 3);
 
   let tileW = 1, tileH = 1;
   let _hasGatherTargets = false;
@@ -138,6 +139,12 @@ void main() {
   // ── Model material caches ─────────────────────────────────────────────────
   const _voidFigureMats = [];
   const _heroCanvasMats = [];
+
+  // Extra objects that must vanish alongside the models during shatter —
+  // pedestals, halos, anything else that lives at the model's slot. Toggled
+  // via `.visible` so a single flag hides mesh + material + shadow output.
+  const _heroExtras = [];
+  const _voidExtras = [];
 
   function _collectMats(root, out) {
     const seen = new Set();
@@ -153,6 +160,13 @@ void main() {
   function _restoreMats() {
     for (const m of _heroCanvasMats) m.opacity = 1.0;
     for (const m of _voidFigureMats) m.opacity = 1.0;
+    for (const o of _heroExtras)     o.visible = true;
+    for (const o of _voidExtras)     o.visible = true;
+  }
+
+  function _hideExtras() {
+    for (const o of _heroExtras) o.visible = false;
+    for (const o of _voidExtras) o.visible = false;
   }
 
   // ── Grid construction ─────────────────────────────────────────────────────
@@ -184,16 +198,28 @@ void main() {
     }
   }
 
-  function _buildScatter() {
+  // Seed the per-instance random scatter direction + rotation. Called ONCE
+  // at capture — random values must stay stable across frames, otherwise
+  // rebuilding scatterPos inside Phase 1a would re-randomize destinations.
+  function _seedScatterDirs() {
     const dir = new THREE.Vector3();
     for (let i = 0; i < N; i++) {
       dir.set(Math.random() - 0.5, Math.random() - 0.5, Math.random() - 0.5)
          .normalize()
          .multiplyScalar(DIST * (0.4 + Math.random() * 0.6));
-      scatterPos[i] = gridPos[i].clone().add(dir);
+      scatterDir[i].copy(dir);
       scatterRot[i * 3]     = (Math.random() - 0.5) * Math.PI * 2;
       scatterRot[i * 3 + 1] = (Math.random() - 0.5) * Math.PI * 2;
       scatterRot[i * 3 + 2] = (Math.random() - 0.5) * Math.PI * 2;
+    }
+  }
+
+  // Recompute scatterPos from the current gridPos + stored directions.
+  // Called every frame during Phase 1a (so the scatter targets track the
+  // moving freeze-frame) and frozen at the moment Phase 1b starts.
+  function _computeScatterPositions() {
+    for (let i = 0; i < N; i++) {
+      scatterPos[i] = gridPos[i].clone().add(scatterDir[i]);
     }
   }
 
@@ -244,16 +270,43 @@ void main() {
   }
 
   // ── Public: register hero_canvas for scatter-phase fade-out ──────────────
-  function setHeroCanvas(root) {
+  function setHeroCanvas(root, extras = []) {
     _collectMats(root, _heroCanvasMats);
     for (const m of _heroCanvasMats) { m.transparent = true; m.opacity = 1.0; }
-    console.log(`[shatter] hero_canvas primed — ${_heroCanvasMats.length} material(s)`);
+    for (const o of extras) _heroExtras.push(o);
+    console.log(`[shatter] hero_canvas primed — ${_heroCanvasMats.length} material(s), ${extras.length} extras`);
+  }
+
+  // ── Public: register objects that should also vanish behind the freeze
+  // frame (e.g. void_figure's pedestal + halo). Kept separate so their
+  // restore timing can differ from the model's material fade-in.
+  function setVoidExtras(extras = []) {
+    for (const o of extras) _voidExtras.push(o);
+  }
+
+  // Re-render the scene into the FBO with everything visible at full
+  // opacity — used to refresh the freeze-frame texture during Phase 1a so
+  // it always matches the current camera view. Without this, scroll-back
+  // shows a stale mosaic that jump-cuts to the live scene at range exit.
+  function _recaptureFBO() {
+    mesh.visible = false;
+    _setOpacity(_heroCanvasMats, 1.0);
+    _setOpacity(_voidFigureMats, 1.0);
+    for (const o of _heroExtras) o.visible = true;
+    for (const o of _voidExtras) o.visible = true;
+
+    renderer.setRenderTarget(fbo);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(null);
+
+    mesh.visible = true;
   }
 
   // ── Public: capture scene → FBO, activate mosaic ─────────────────────────
   function capture() {
     _buildGrid();
-    _buildScatter();
+    _seedScatterDirs();
+    _computeScatterPositions();
 
     renderer.setRenderTarget(fbo);
     renderer.render(scene, camera);
@@ -308,15 +361,40 @@ void main() {
     // ── Phase 1a: freeze hold — tiles cover screen as a stationary mosaic ───────
     if (effectT < SHATTER_T_SCATTER_START) {
       // sp=0 keeps all tiles at gridPos (exact screen coverage = freeze-frame).
-      // Hero/void models stay at full opacity behind the tile layer.
+      // Rebuild gridPos each frame so the mosaic keeps sitting in front of
+      // the camera as the orbit motion continues during the hold. Without
+      // this, the tiles stay world-anchored at capture time and drift out
+      // of view as the camera moves — that drift reads as the "screen jump"
+      // right before the scatter fires.
+      _buildGrid();
+      _computeScatterPositions();
+
+      // Refresh the FBO every frame so the freeze-frame texture matches
+      // the current camera view. Cures the reverse-scroll jump at range
+      // exit: without recapture, tiles show the stale forward-capture
+      // view, then the live scene pops in at t < 0.51.
+      _recaptureFBO();
+
       sp      = 0;
       rotP    = 0;
       fromPos = gridPos;
       toPos   = scatterPos;
       bgDark  = 0;
 
-      _setOpacity(_heroCanvasMats, 1.0);
-      _setOpacity(_voidFigureMats, 1.0);
+      // Symmetric fade under the freeze frame: hero + void ramp 1→0 across
+      // the hold window, so reverse-scroll picks up at opacity 1 by the
+      // time the tiles disappear (no "hero pops back" jump). Tiles fully
+      // cover the frame during Phase 1a, so the forward fade is invisible
+      // — user still perceives an instant magic-trick vanish.
+      const p1a = smoothstep(
+        (effectT - SHATTER_T_ENTER) / (SHATTER_T_SCATTER_START - SHATTER_T_ENTER),
+      );
+      const behind = 1 - p1a;
+      _setOpacity(_heroCanvasMats, behind);
+      _setOpacity(_voidFigureMats, behind);
+      const extrasHidden = p1a > 0.5;
+      for (const o of _heroExtras) o.visible = !extrasHidden;
+      for (const o of _voidExtras) o.visible = !extrasHidden;
       _su.uOpacity.value    = 1.0;
       _su.uTintAmount.value = 0.0;
 
@@ -331,21 +409,27 @@ void main() {
       toPos   = scatterPos;
       bgDark  = p1;
 
-      _setOpacity(_heroCanvasMats, 1 - p1);
-      _setOpacity(_voidFigureMats, 1 - p1);
+      _setOpacity(_heroCanvasMats, 0.0);
+      _setOpacity(_voidFigureMats, 0.0);
+      _hideExtras();
       _su.uOpacity.value    = 1.0;
       _su.uTintAmount.value = 0.0;
 
     // ── Phase 2: hold (cubes scattered, text appears / holds / fades) ────────
     } else if (effectT < SHATTER_T_TEXT_GONE) {
       sp      = 1;
-      rotP    = 0; // cubes have settled
+      // rotP stays at 1 through the whole hold — otherwise the cubes
+      // snap back to identity rotation the instant Phase 2 begins (the
+      // "cards all straighten at once" glitch). Phase 3's `1 - p3` picks
+      // up from 1 seamlessly, so they rotate back naturally during gather.
+      rotP    = 1;
       fromPos = gridPos;
       toPos   = scatterPos;
       bgDark  = 1.0;
 
       _setOpacity(_heroCanvasMats, 0.0);
       _setOpacity(_voidFigureMats, 0.0); // hidden — cubes float in dark void
+      _hideExtras();
       _su.uOpacity.value    = 1.0;
       _su.uTintAmount.value = 0.0;
 
@@ -377,6 +461,7 @@ void main() {
 
         _setOpacity(_heroCanvasMats, 0.0);
         _setOpacity(_voidFigureMats, 0.0); // hidden — cube-form IS the figure
+        _hideExtras();
         _su.uOpacity.value    = 1.0;
         _su.uTintAmount.value = p3 * TINT_MAX;
       } else {
@@ -403,6 +488,11 @@ void main() {
 
       _setOpacity(_heroCanvasMats, 0.0);
       _setOpacity(_voidFigureMats, p4);
+      // Void_figure extras reappear alongside the model — pedestal + halo
+      // pop back in at Phase 4 start; hero extras stay hidden until the
+      // camera leaves the shatter range entirely.
+      for (const o of _voidExtras) o.visible = true;
+      for (const o of _heroExtras) o.visible = false;
       _su.uOpacity.value    = 1 - p4;
       _su.uTintAmount.value = TINT_MAX * (1 - p4);
     }
@@ -432,5 +522,5 @@ void main() {
     _restoreMats();
   }
 
-  return { capture, update, setSurface, setHeroCanvas, dispose, mesh };
+  return { capture, update, setSurface, setHeroCanvas, setVoidExtras, dispose, mesh };
 }
