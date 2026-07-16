@@ -369,7 +369,9 @@ function tick(now = 0) {
   }
 
   if (isMobile) {
-    splineTSmooth += (splineT - splineTSmooth) * 0.11;
+    // Bumped 0.11 → 0.18: faster catch-up so long-distance flicks don't
+    // feel like the camera is "falling" behind for half a second.
+    splineTSmooth += (splineT - splineTSmooth) * 0.18;
     _camTarget.copy(camPath.getPoint(splineTSmooth));
     camera.position.copy(_camTarget);
   } else {
@@ -422,14 +424,17 @@ function tick(now = 0) {
 
   if (!isMobile) animateDust(elapsed);
 
-  // Shatter must follow the *raw* scroll position on both platforms.
-  // Using splineTSmooth on mobile made the smoothed T interpolate through
-  // the 0.51-0.65 range on its own after any fast scroll → the effect
-  // played automatically, and it also missed the correct trigger point
-  // relative to what the user was actually looking at. Raw splineT keeps
-  // the shatter locked to the user's actual scroll position.
-  const effectT = splineT;
-  if (effectT >= SHATTER_T_ENTER && !_shatterCaptured) {
+  // Shatter must follow the *raw* scroll position, otherwise a smoothed T
+  // interpolates through the trigger range on its own after a fast flick.
+  // Mobile also adds a +0.02 offset because the mobile camera path has
+  // more control points around void_figure (orbitN=36 vs 32), which
+  // shifts void_figure orbit start from t≈0.525 (desktop) to t≈0.508
+  // (mobile). Without the offset, SHATTER_T_ENTER=0.51 fires *inside*
+  // the void orbit — capturing void_figure instead of hero_canvas — so
+  // model 3 never appears to shatter and model 4 shatters on its own.
+  const effectT = splineT + (isMobile ? 0.02 : 0);
+  const inRange = effectT >= SHATTER_T_ENTER && effectT <= SHATTER_T_DISSOLVE_END;
+  if (inRange && !_shatterCaptured) {
     _shatterCaptured = true;
     shatter.capture();
   }
