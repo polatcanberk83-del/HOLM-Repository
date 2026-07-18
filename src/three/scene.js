@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import marbleWallUrl from "../assets/marble-wall-exp-1.webp";
 
 export function createScene(canvas, isMobile = false) {
   // ---------- Renderer ----------
@@ -68,6 +69,54 @@ export function createScene(canvas, isMobile = false) {
   floor.position.set(0, 0.001, -39);
   floor.receiveShadow = true;
   scene.add(floor);
+
+  // ── Tavan — düz navy, ışık yakalamıyor.
+  //    MeshBasicMaterial hiçbir light'a cevap vermediği için her modelin
+  //    key light'ı tavana çember pool'u bırakmıyor. Sonuç: floor'la
+  //    aynı renk kimliğinde ama üniform dome; koridorun "kapalı üst"
+  //    hissini bozmuyor.
+  const ceilingMat = new THREE.MeshBasicMaterial({
+    color: 0x0e1e58,
+  });
+  const ceiling = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), ceilingMat);
+  ceiling.rotation.x = Math.PI / 2;   // face downward
+  ceiling.position.set(0, 7.99, -39);
+  scene.add(ceiling);
+
+  // ── Sol + sağ duvarlar — mermer texture (marble-wall-exp-1.webp)
+  //    Tek kare kalıp, X boyunca 12 tekrar (~8.5m tile ≈ neredeyse
+  //    kare) × Y boyunca 1 tekrar (8m boyu tam kaplıyor). Vite asset
+  //    pipeline'ı fingerprint URL sağlıyor, TextureLoader hallediyor.
+  const marbleTex = new THREE.TextureLoader().load(marbleWallUrl);
+  marbleTex.colorSpace = THREE.SRGBColorSpace;
+  marbleTex.wrapS = THREE.RepeatWrapping;
+  marbleTex.wrapT = THREE.RepeatWrapping;
+  marbleTex.repeat.set(12, 1);
+  marbleTex.anisotropy = 8;  // dik açıdan bakışta blur/moire azaltır
+
+  // color × map ile texture dimlenir — ambient 75 + hemi 55 altında
+  // beyaz marble lightbox oluyordu, mid-gray multiplier ile stone-vari
+  // "aydınlatılmış ama patlamayan" bir seviyeye çekiyoruz.
+  // Roughness 0.90 → spekülar highlight tamamen dağılıyor, key light
+  // altında bile duvar glare vermiyor.
+  const marbleMat = new THREE.MeshStandardMaterial({
+    map:       marbleTex,
+    color:     0x656570,   // mid-tone dim — 4a4a52'den bir tık açık
+    roughness: 0.78,       // matte polished, glare değil ama polish hissi var
+    metalness: 0.00,
+  });
+
+  const leftWall = new THREE.Mesh(new THREE.PlaneGeometry(102, 8), marbleMat);
+  leftWall.rotation.y = Math.PI / 2;   // normal points +x (interior facing)
+  leftWall.position.set(-9.99, 4, -39);
+  leftWall.receiveShadow = true;
+  scene.add(leftWall);
+
+  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(102, 8), marbleMat);
+  rightWall.rotation.y = -Math.PI / 2; // normal points -x
+  rightWall.position.set(9.99, 4, -39);
+  rightWall.receiveShadow = true;
+  scene.add(rightWall);
 
   // ---------- Lighting ----------
   // THREE.js 0.184 fiziksel birim: intensity = candela.
