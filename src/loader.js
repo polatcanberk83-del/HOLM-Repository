@@ -87,8 +87,10 @@ function sampleDiamondVolume(count) {
   return { positions, seeds };
 }
 
-// ─── Brilliant-cut diamond geometry (kept for reference/reuse) ─────
-function createBrilliantDiamond(N = 16) {
+// ─── Brilliant-cut diamond geometry (exported so page-transition veil
+//     can reuse the same jewel — visual continuity between the entry
+//     loader and the mid-navigation hold) ─────────────────────────────
+export function createBrilliantDiamond(N = 16) {
   const positions = [];
   const indices   = [];
   const halfStep  = Math.PI / N;
