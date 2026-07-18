@@ -6,6 +6,7 @@ import { createScene, createHalo, createProjectionPlane } from "./three/scene.js
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel, setLoadingManager } from "./three/loader.js";
 import { Loader }                       from "./loader.js";
+import { createUnderwaterSystem }       from "./three/underwater.js";
 import { Menu }                         from "./menu.js";
 import { initHoverRoll }                from "./hoverRoll.js";
 import { mountPageTransition, signalPageReady } from "./pageTransition.js";
@@ -52,7 +53,13 @@ const ARM_REVEAL_INTENSITY   = 900.0;
 const ARM_CRYSTAL_Z          = -48;
 const SPOT_INTENSITY_BASE    = 30.0;
 
-const post      = createPostProcessing(renderer, scene, camera, isMobile);
+// ── Underwater system — wave-sim RT + a compositing pass in the composer.
+//    Creates the "museum is submerged" feel: gentle refraction of the
+//    entire scene, drifting caustics on the highlights, cool aquatic tint.
+//    Mouse motion drops ripples that visibly bend the scene through the
+//    surface. Ambient wandering sources keep the water alive with no input.
+const underwater = createUnderwaterSystem(renderer, { isMobile });
+const post      = createPostProcessing(renderer, scene, camera, isMobile, underwater.pass);
 
 // Reveal factor — starts at 0 when loader finishes, eases to 1 so the scene
 // gently "wakes up" behind the iris rather than snapping to full brightness.
@@ -139,12 +146,9 @@ function findNearest(camPos) {
   return { def: best, dist: minD };
 }
 
-// ---------- Hover distortion state ----------
-const raycaster    = new THREE.Raycaster();
-const pointer      = new THREE.Vector2(-9, -9);
-const clock        = new THREE.Clock();
-const distortItems = [];
-let   hoveredZ     = null;
+// ---------- Pointer tracking (feeds underwater wave sim) ----------
+const pointer = new THREE.Vector2(-9, -9);
+const clock   = new THREE.Clock();
 
 canvas.addEventListener("pointermove", e => {
   pointer.x =  (e.clientX / window.innerWidth)  * 2 - 1;
@@ -225,28 +229,6 @@ async function loadOneModel(def, modelIdx) {
     model.traverse(c => {
       if (!c.isMesh) return;
       c.castShadow = c.receiveShadow = !isMobile;
-
-      if (!isMobile) {
-        const mat      = c.material.clone();
-        const uniforms = { uTime: { value: 0 }, uIntensity: { value: 0 } };
-        mat.onBeforeCompile = shader => {
-          shader.uniforms.uTime      = uniforms.uTime;
-          shader.uniforms.uIntensity = uniforms.uIntensity;
-          shader.vertexShader =
-            "uniform float uTime;\nuniform float uIntensity;\n" +
-            shader.vertexShader.replace(
-              "#include <begin_vertex>",
-              `#include <begin_vertex>
-               float _w = sin(position.x * 4.0 + uTime * 1.3)
-                        * sin(position.y * 3.5 + uTime * 0.9)
-                        * 0.015 * uIntensity;
-               transformed += normal * _w;`,
-            );
-        };
-        mat.customProgramCacheKey = () => "holm_distort";
-        c.material = mat;
-        distortItems.push({ mesh: c, uniforms, defZ: def.z });
-      }
     });
 
     scene.add(model);
@@ -359,21 +341,6 @@ function tick(now = 0) {
 
   const elapsed = clock.getElapsedTime();
 
-  if (!isMobile) {
-    raycaster.setFromCamera(pointer, camera);
-    const hits = raycaster.intersectObjects(distortItems.map(d => d.mesh), false);
-    hoveredZ = hits.length > 0
-      ? (distortItems.find(d => d.mesh === hits[0].object)?.defZ ?? null)
-      : null;
-    for (const item of distortItems) {
-      item.uniforms.uTime.value = elapsed;
-      const target = item.defZ === hoveredZ ? 1 : 0;
-      const iv = item.uniforms.uIntensity;
-      iv.value += (target - iv.value) * 0.12;
-      if (iv.value < 0.001) iv.value = 0;
-    }
-  }
-
   if (isMobile) {
     // Bumped 0.11 → 0.18: faster catch-up so long-distance flicks don't
     // feel like the camera is "falling" behind for half a second.
@@ -427,6 +394,15 @@ function tick(now = 0) {
   if (post.bokeh)         post.bokeh.uniforms["focus"].value       = dist;
   if (post.grainVignette) post.grainVignette.uniforms.uTime.value  = elapsed;
   wallUniforms.uTime.value = elapsed;
+
+  // Underwater wave step — pointer.x defaults to -9 (offscreen), which
+  // maps to negative normalized coords → setMouseNorm treats as "no touch"
+  // and the ambient sources keep the surface breathing regardless.
+  underwater.setMouseNorm(
+    (pointer.x + 1) * 0.5,
+    (pointer.y + 1) * 0.5,
+  );
+  underwater.update();
 
   if (!isMobile) animateDust(elapsed);
 

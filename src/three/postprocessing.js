@@ -80,7 +80,7 @@ const GrainVignetteShader = {
   `,
 };
 
-export function createPostProcessing(renderer, scene, camera, isMobile = false) {
+export function createPostProcessing(renderer, scene, camera, isMobile = false, underwaterPass = null) {
   const w = window.innerWidth;
   const h = window.innerHeight;
 
@@ -118,6 +118,11 @@ export function createPostProcessing(renderer, scene, camera, isMobile = false) 
     });
     composer.addPass(bokeh);
   }
+
+  // 4.5 Underwater refraction — displaces the scene through a moving water
+  //     surface + adds caustics + cool tint. Placed after depth-reading
+  //     passes (SSAO/Bokeh) so their sampling stays geometrically correct.
+  if (underwaterPass) composer.addPass(underwaterPass);
 
   // 5. Chromatic aberration — desktop only
   let chroma = null;
