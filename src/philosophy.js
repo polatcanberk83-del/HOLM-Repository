@@ -31,10 +31,14 @@ const FLUID_STOP_DECAY  = 0.92;
 const FLUID_DISTORTION  = 1.6;
 const FLUID_INTENSITY   = 0.72;
 const FLUID_SOFTNESS    = 1.4;
-const FLUID_COLOR_1     = "#000000";
-const FLUID_COLOR_2     = "#02040c";
-const FLUID_COLOR_3     = "#06183a";
-const FLUID_COLOR_4     = "#123063";
+// Palette aligned with the homepage: body bg, mid-dark transition,
+// deep-royal floor navy, and the halo/logo brand cobalt as the peak.
+// Ensures the fluid gradient reads as an extension of the same
+// language the visitor just left in the museum.
+const FLUID_COLOR_1     = "#08050a";   // homepage body bg
+const FLUID_COLOR_2     = "#0a1230";   // dark transition
+const FLUID_COLOR_3     = "#0e1e58";   // homepage floor navy
+const FLUID_COLOR_4     = "#1a44cc";   // homepage halo brand cobalt
 
 // ─── Fluid shaders (adapted from an interactive-gradient reference) ──
 const FLUID_VERT = /* glsl */`
