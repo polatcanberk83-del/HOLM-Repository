@@ -46,13 +46,22 @@ export function createScene(canvas, isMobile = false) {
   room.receiveShadow = true;
   scene.add(room);
 
-  // Zemin — hafif yansımalı
+  // Zemin — brand blue, PBR-lit
+  //
+  // MeshStandardMaterial ambient + hemi + spot + her modelin key
+  // light'ını doğal şekilde yakalıyor. Sonuç: her modelin altında
+  // bright pool of light + koridorun geri kalanı brand cobalt tint.
+  // Reflection yok (Reflector shader'ı hiç ışık almadığı için taban
+  // görünmüyordu — önce görünürlük). Reflection'ı sonra layered
+  // material olarak eklenebilir.
   const floorMat = new THREE.MeshStandardMaterial({
-    color:             0x2b2b36, // açık gri-mavi (hafif yükseltildi)
-    roughness:         0.85,
-    metalness:         0.10,
-    emissive:          new THREE.Color(0x1c1c26), // gri glow (hafif yükseltildi)
-    emissiveIntensity: 12.5,     // ince ayar buradan
+    // Deep royal blue — brand family ama saturated primary değil.
+    // Ambient 75 + hemi 55 + key lights bu koyu tonu bile ışık
+    // pool'larında brand cobalt'a çıkarıyor; koridorun geri kalanı
+    // deep navy'de kalıyor, palette dengesi bozulmuyor.
+    color:     0x0e1e58,
+    roughness: 0.72,       // matte polished — spekülar highlight yayılıyor
+    metalness: 0.04,       // near-dielectric — enamel parlaklığı yok
   });
   const floor = new THREE.Mesh(new THREE.PlaneGeometry(20, 102), floorMat);
   floor.rotation.x = -Math.PI / 2;

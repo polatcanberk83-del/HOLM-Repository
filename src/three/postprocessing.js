@@ -68,11 +68,13 @@ const GrainVignetteShader = {
       // Film grain — skipped on mobile (uGrainAmp = 0)
       color.rgb += filmGrain(vUv, uTime) * uGrainAmp;
 
-      // Vignette — smooth darkening toward edges; uVignetteAmp = 0 on
-      // mobile so the screen edges stay flat + fully lit
+      // Vignette — soft darkening toward edges. Range widened
+      // (0.6 → 1.6) so the drop-off starts halfway to the edge and
+      // corners land at ~30% brightness instead of pure black. Prevents
+      // the "radial black frame" that jumps out on bright surfaces.
       vec2  vig      = (vUv - 0.5) * 2.0;
       float vigDist  = length(vig);
-      float vignette = 1.0 - smoothstep(0.3, 1.2, vigDist);
+      float vignette = 1.0 - smoothstep(0.6, 1.6, vigDist) * 0.55;
       color.rgb     *= mix(1.0, vignette, uVignetteAmp);
 
       gl_FragColor = color;
