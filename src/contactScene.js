@@ -53,10 +53,11 @@ export const CONFIG = {
   // Direct light from the dedicated medallion key (see _addMedallionLights)
   // does most of the heavy lifting; env map just adds specular character.
   material: {
-    color:           0x8e8e92,   // silver — cool, mid-dark
+    color:           0x606670,   // gunmetal / brushed steel — reads as
+                                 // industrial hardware, not polished jewelry
     metalness:       1.0,
-    roughness:       0.6,
-    envMapIntensity: 0.2,
+    roughness:       0.42,       // sharper reflections than silver had (0.6)
+    envMapIntensity: 0.32,       // env is what makes metal "read" — bumped
   },
 
   // Engraved TALK / WRITE text — dark patina, still catches enough light
