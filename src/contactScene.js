@@ -249,17 +249,24 @@ export class ContactScene {
     const tier = this._deviceTier;
 
     if (tier === "mobile") {
-      CONFIG.medallionScale        = isPortrait ? 1.20 : 1.35;
-      CONFIG.pendulums[0].anchor.x = isPortrait ? -0.55 : -0.95;
-      CONFIG.pendulums[1].anchor.x = isPortrait ?  0.55 :  0.95;
-      CONFIG.pendulums[0].anchor.z = isPortrait ? 6 : 6.5;
-      CONFIG.pendulums[1].anchor.z = isPortrait ? 6 : 6.5;
-      CONFIG.pendulums[0].anchor.y = isPortrait ? 4.4 : 4.6;
-      CONFIG.pendulums[1].anchor.y = isPortrait ? 4.4 : 4.6;
+      // Portrait: push medallions WAY back (z=2 vs camera z=7) AND
+      // shrink scale so two of them fit comfortably in a phone's narrow
+      // horizontal FOV. Landscape phone is less extreme but still needs
+      // more breathing room than desktop.
+      CONFIG.medallionScale        = isPortrait ? 0.65 : 0.95;
+      CONFIG.pendulums[0].anchor.x = isPortrait ? -0.42 : -0.75;
+      CONFIG.pendulums[1].anchor.x = isPortrait ?  0.42 :  0.75;
+      CONFIG.pendulums[0].anchor.z = isPortrait ? 2.0 : 4.0;
+      CONFIG.pendulums[1].anchor.z = isPortrait ? 2.0 : 4.0;
+      CONFIG.pendulums[0].anchor.y = isPortrait ? 4.2 : 4.4;
+      CONFIG.pendulums[1].anchor.y = isPortrait ? 4.2 : 4.4;
       // Chain physics: cheaper on mobile so fps holds
       CONFIG.chain.segments   = 10;
       CONFIG.chain.iterations = 4;
-      CONFIG.medallionLight.intensity = 140;
+      // Key light follows the medallions back — otherwise the distance
+      // falloff (decay=2) kills the specular.
+      CONFIG.medallionLight.position.z = CONFIG.pendulums[0].anchor.z + 2;
+      CONFIG.medallionLight.intensity  = 140;
     } else if (tier === "tablet") {
       CONFIG.medallionScale        = isPortrait ? 1.35 : 1.5;
       CONFIG.pendulums[0].anchor.x = isPortrait ? -0.75 : -1.05;
