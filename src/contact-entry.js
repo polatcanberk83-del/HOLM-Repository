@@ -31,13 +31,11 @@ const menu = new Menu({ lenis });
 menu.mount();
 
 // ─── Contact page ───────────────────────────────────────────────
-// EXPERIMENT: swapped the original diamond-cluster Contact for an
-// isolated Three.js scene that renders a single GLB medallion. Old
-// Contact left imported but unused so the swap is one-line reversible.
+// Medallion scene replaces the old diamond cluster. Old `Contact`
+// import kept for one-line rollback if we ever need it.
 // const contact = new Contact();
 // contact.init();
 const contactScene = new ContactScene();
-contactScene.mount();
 
 // Wrap [data-hover-roll] targets — the 3 huge links
 initHoverRoll(document);
@@ -46,11 +44,14 @@ initHoverRoll(document);
 // while the next page loads
 mountPageTransition();
 
-// Give the fluid backdrop + font a moment, then reveal. The transition
-// only actually plays when we arrived via a nav; a fresh load is a no-op.
-window.addEventListener("load", () => {
-  setTimeout(signalPageReady, 200);
-});
+// CRITICAL: signal READY only AFTER the scene has finished mounting.
+// contactScene.mount() awaits HDRI + medallion GLB + (on non-mobile)
+// the 5 corridor sculptures. If we called signalPageReady on window
+// load like we used to, the transition cover would drop before models
+// were ready — user would see a black flash / half-populated corridor.
+contactScene.mount()
+  .catch((err) => console.error("[contact] mount failed:", err))
+  .finally(() => signalPageReady());
 
 window.addEventListener("pagehide", () => {
   contactScene.destroy();
