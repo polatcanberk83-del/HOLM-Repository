@@ -102,8 +102,20 @@ export const CONFIG = {
   // into view. z=7 is closer to camera (which sits at z=10) than the
   // first sculpture at z=0 — medallions dominate the frame.
   pendulums: [
-    { anchor: { x: -1.15, y: 5.0, z: 7 }, faceBack: false }, // TALK
-    { anchor: { x:  1.15, y: 5.0, z: 7 }, faceBack: true  }, // WRITE
+    {
+      anchor:   { x: -1.15, y: 5.0, z: 7 },
+      faceBack: false,
+      // TALK medallion — click / tap opens the cal.com booking page
+      // in a new tab so the scene isn't destroyed under the visitor.
+      action:   { type: "external", href: "https://cal.com/canberk-polat-dpsl0y/discovery-call" },
+    },
+    {
+      anchor:   { x:  1.15, y: 5.0, z: 7 },
+      faceBack: true,
+      // WRITE medallion — click / tap fires a mailto:. Browsers hand
+      // off to the OS mail handler; the page itself stays put.
+      action:   { type: "mailto", href: "mailto:contact@byholm.co" },
+    },
   ],
 
   twist: {
@@ -197,6 +209,7 @@ export class ContactScene {
 
     this._onResize      = this._onResize.bind(this);
     this._onPointerMove = this._onPointerMove.bind(this);
+    this._onClick       = this._onClick.bind(this);
   }
 
   // ── Mount ─────────────────────────────────────────────────────────
@@ -221,6 +234,7 @@ export class ContactScene {
 
     window.addEventListener("resize",      this._onResize);
     window.addEventListener("pointermove", this._onPointerMove, { passive: true });
+    this.canvas.addEventListener("click",  this._onClick);
 
     this._startLoop();
   }
@@ -738,6 +752,47 @@ export class ContactScene {
       this._mouseWorld.copy(_HIT);
       this._mouseValid = true;
     }
+
+    // Hover cursor — pointer icon over a medallion so it reads as clickable.
+    const hit = this._raycastMedallion();
+    this.canvas.style.cursor = hit ? "pointer" : "";
+  }
+
+  // ── Click → per-pendulum action (cal.com booking / mailto) ──────
+  _onClick() {
+    const hit = this._raycastMedallion();
+    if (!hit) return;
+    const action = hit.cfg.action;
+    if (!action) return;
+    if (action.type === "external") {
+      window.open(action.href, "_blank", "noopener,noreferrer");
+    } else if (action.type === "mailto") {
+      // Same-tab mailto — browsers dispatch to the OS handler without
+      // actually navigating away, so the scene keeps rendering.
+      window.location.href = action.href;
+    }
+  }
+
+  // Raycasts the current pointer NDC against both medallion rigs and
+  // returns the hit pendulum (or null). Cheap: two rigs, small mesh
+  // trees; fine to call on every pointermove.
+  _raycastMedallion() {
+    if (!this.pendulums.length) return null;
+    this._raycaster.setFromCamera(this._pointerNDC, this.camera);
+    const rigs = _RIG_SCRATCH;
+    rigs.length = 0;
+    for (const pend of this.pendulums) rigs.push(pend.rig);
+    const hits = this._raycaster.intersectObjects(rigs, true);
+    if (!hits.length) return null;
+    // Walk up from the hit mesh to find which pendulum rig owns it.
+    let obj = hits[0].object;
+    while (obj) {
+      for (const pend of this.pendulums) {
+        if (pend.rig === obj) return pend;
+      }
+      obj = obj.parent;
+    }
+    return null;
   }
 
   // ── Loop ─────────────────────────────────────────────────────────
@@ -790,6 +845,7 @@ export class ContactScene {
     if (this._rafId) cancelAnimationFrame(this._rafId);
     window.removeEventListener("resize",      this._onResize);
     window.removeEventListener("pointermove", this._onPointerMove);
+    this.canvas?.removeEventListener("click", this._onClick);
     this._restoreScroll();
 
     // Pendulums
@@ -857,3 +913,4 @@ const _VREF_X = new THREE.Vector3(1, 0, 0);
 const _VREF_Z = new THREE.Vector3(0, 0, 1);
 const _HIT    = new THREE.Vector3();
 const _MAT    = new THREE.Matrix4();
+const _RIG_SCRATCH = [];
