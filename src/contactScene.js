@@ -22,6 +22,11 @@
 import * as THREE from "three";
 import { RGBELoader }     from "three/examples/jsm/loaders/RGBELoader.js";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
+import { RectAreaLightUniformsLib } from "three/examples/jsm/lights/RectAreaLightUniformsLib.js";
+
+// RectAreaLight uses a LUT for its BRDF integration — must be inited
+// once before any RectAreaLight is added to a scene.
+RectAreaLightUniformsLib.init();
 
 // Shared homepage modules — user-approved direct import.
 import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
@@ -53,11 +58,13 @@ export const CONFIG = {
   // Direct light from the dedicated medallion key (see _addMedallionLights)
   // does most of the heavy lifting; env map just adds specular character.
   material: {
-    color:           0x606670,   // gunmetal / brushed steel — reads as
-                                 // industrial hardware, not polished jewelry
+    color:           0x606670,   // gunmetal / brushed steel
     metalness:       1.0,
-    roughness:       0.42,       // sharper reflections than silver had (0.6)
-    envMapIntensity: 0.32,       // env is what makes metal "read" — bumped
+    roughness:       0.5,        // slightly higher than 0.42 — spreads the
+                                 // specular so a centered viewing angle
+                                 // no longer collapses the softbox into a
+                                 // pinpoint hotspot on the top of the disc
+    envMapIntensity: 0.32,
   },
 
   // Engraved TALK / WRITE text — dark patina, still catches enough light
@@ -76,12 +83,38 @@ export const CONFIG = {
 
   // Dedicated key light for the medallions (analytic, colored, high
   // intensity to compete with the homepage's aggressive ACES exposure).
+  // Studio softbox rig for the medallions. A point light on shiny metal
+  // creates a sharp hotspot on one facet + dark neighboring facets —
+  // exactly the "some angles too bright, some too dark" problem. A big
+  // RectAreaLight acts as a large emitter surface, spreading the specular
+  // across the whole face. A small fill on the opposite side keeps the
+  // shadow side from going black.
   medallionLight: {
-    color:     0xffffff,
-    intensity: 180,
-    distance:  14,
-    decay:     2,
-    position:  { x: 0, y: 4.5, z: 9 },   // slightly above + in front of pair
+    // Key — big softbox CENTERED above/in-front of the pair so both
+    // medallions get identical exposure. Off-center key blows out the
+    // near medallion and starves the far one.
+    key: {
+      color:     0xffffff,
+      // Bigger emitter surface (10×5 vs 5.5×3) → the light's reflection
+      // on the metal is spread across a wider angle band, so no single
+      // viewing angle sees the full light source concentrated into a
+      // pinpoint. Intensity dropped to compensate for the ~3× area.
+      intensity: 1.6,
+      width:     10.0,
+      height:    5.0,
+      position:  { x: 0.0, y: 3.0, z: 9.5 },
+      target:    { x: 0.0, y: 2.4, z: 6.0 },
+    },
+    // Fill — subtle warm from below/front, evens shadow side. Kept
+    // gentle so it doesn't undo the key's directionality.
+    fill: {
+      color:     0xf0f4ff,
+      intensity: 1.5,
+      width:     4.0,
+      height:    2.5,
+      position:  { x: 0.0, y: 1.6, z: 9.5 },
+      target:    { x: 0.0, y: 2.4, z: 6.0 },
+    },
   },
 
   // Chain physics + link geometry.
@@ -180,7 +213,8 @@ export class ContactScene {
     // Chain.
     this.pendulums   = [];
     this._chainGeom  = null;
-    this._medallionKey = null;
+    this._medallionKey  = null;
+    this._medallionFill = null;
 
     // Dust.
     this._dustGeometry         = null;
@@ -264,10 +298,17 @@ export class ContactScene {
       // Chain physics: cheaper on mobile so fps holds
       CONFIG.chain.segments   = 10;
       CONFIG.chain.iterations = 4;
-      // Key light follows the medallions back — otherwise the distance
-      // falloff (decay=2) kills the specular.
-      CONFIG.medallionLight.position.z = CONFIG.pendulums[0].anchor.z + 2;
-      CONFIG.medallionLight.intensity  = 140;
+      // Softbox rig follows the medallions back — otherwise the whole
+      // key+fill sits far from the pendant plane and reads dim.
+      const zNear = CONFIG.pendulums[0].anchor.z + 2;
+      CONFIG.medallionLight.key.position.z    = zNear;
+      CONFIG.medallionLight.key.target.z      = CONFIG.pendulums[0].anchor.z;
+      CONFIG.medallionLight.fill.position.z   = zNear;
+      CONFIG.medallionLight.fill.target.z     = CONFIG.pendulums[0].anchor.z;
+      // Trim area intensities a touch — smaller mobile viewport doesn't
+      // need as much light energy filling the frame.
+      CONFIG.medallionLight.key.intensity     = 1.3;
+      CONFIG.medallionLight.fill.intensity    = 1.0;
     } else if (tier === "tablet") {
       CONFIG.medallionScale        = isPortrait ? 1.35 : 1.5;
       CONFIG.pendulums[0].anchor.x = isPortrait ? -0.75 : -1.05;
@@ -276,7 +317,9 @@ export class ContactScene {
       CONFIG.pendulums[1].anchor.z = 7;
       CONFIG.chain.segments   = 14;
       CONFIG.chain.iterations = 5;
-      CONFIG.medallionLight.intensity = 170;
+      // Tablet: same softbox rig, slightly dialed back key.
+      CONFIG.medallionLight.key.intensity  = 1.4;
+      CONFIG.medallionLight.fill.intensity = 1.1;
     }
     // desktop keeps CONFIG defaults untouched
   }
@@ -508,20 +551,25 @@ export class ContactScene {
     }
   }
 
-  // ── Medallion-only key light ─────────────────────────────────────
-  // The homepage's ambient + hemi + moving spot don't hit the medallions
-  // hard enough to make silver read as silver under exposure 6.5. A
-  // dedicated point light positioned between camera and medallions gives
-  // them the specular "shine" and self-shadowing that separates polished
-  // metal from a dark disc.
+  // ── Medallion-only softbox rig ───────────────────────────────────
+  // Two RectAreaLights (key + fill) act as a two-sided studio softbox.
+  // The large emitter surface prevents the hotspot-and-shadow problem
+  // that a single point light gives on shiny metal.
   _addMedallionLights() {
-    const cfg = CONFIG.medallionLight;
-    const light = new THREE.PointLight(
-      cfg.color, cfg.intensity, cfg.distance, cfg.decay,
-    );
-    light.position.set(cfg.position.x, cfg.position.y, cfg.position.z);
-    this.scene.add(light);
-    this._medallionKey = light;
+    const kc = CONFIG.medallionLight.key;
+    const fc = CONFIG.medallionLight.fill;
+
+    const key = new THREE.RectAreaLight(kc.color, kc.intensity, kc.width, kc.height);
+    key.position.set(kc.position.x, kc.position.y, kc.position.z);
+    key.lookAt(kc.target.x, kc.target.y, kc.target.z);
+    this.scene.add(key);
+    this._medallionKey = key;
+
+    const fill = new THREE.RectAreaLight(fc.color, fc.intensity, fc.width, fc.height);
+    fill.position.set(fc.position.x, fc.position.y, fc.position.z);
+    fill.lookAt(fc.target.x, fc.target.y, fc.target.z);
+    this.scene.add(fill);
+    this._medallionFill = fill;
   }
 
   // ── Dust particles (from main.js) ────────────────────────────────
@@ -869,7 +917,8 @@ export class ContactScene {
     this._chainGeom?.dispose();
     this._chainGeom = null;
     this._medallionTemplate = null;
-    if (this._medallionKey) { this.scene?.remove(this._medallionKey); this._medallionKey = null; }
+    if (this._medallionKey)  { this.scene?.remove(this._medallionKey);  this._medallionKey  = null; }
+    if (this._medallionFill) { this.scene?.remove(this._medallionFill); this._medallionFill = null; }
 
     // Sculptures
     for (const obj of this._sculptures) {
