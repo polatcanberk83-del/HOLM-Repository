@@ -3,6 +3,7 @@ import gsap  from "gsap";
 
 import { Menu }                                    from "./menu.js";
 import { Contact }                                 from "./contact.js";
+import { ContactScene }                            from "./contactScene.js";
 import { initHoverRoll }                           from "./hoverRoll.js";
 import { mountPageTransition, signalPageReady }    from "./pageTransition.js";
 
@@ -30,8 +31,13 @@ const menu = new Menu({ lenis });
 menu.mount();
 
 // ─── Contact page ───────────────────────────────────────────────
-const contact = new Contact();
-contact.init();
+// EXPERIMENT: swapped the original diamond-cluster Contact for an
+// isolated Three.js scene that renders a single GLB medallion. Old
+// Contact left imported but unused so the swap is one-line reversible.
+// const contact = new Contact();
+// contact.init();
+const contactScene = new ContactScene();
+contactScene.mount();
 
 // Wrap [data-hover-roll] targets — the 3 huge links
 initHoverRoll(document);
@@ -47,7 +53,7 @@ window.addEventListener("load", () => {
 });
 
 window.addEventListener("pagehide", () => {
-  contact.destroy();
+  contactScene.destroy();
   menu.destroy?.();
   lenis.destroy?.();
 });
