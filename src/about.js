@@ -26,14 +26,15 @@ const FILL_FRAC       = 1.220;
 const LOOKAT_OFFSET_X = 0.370;   // +ve pushes model LEFT so essay has room on the right
 const LOOKAT_OFFSET_Y = -0.360;
 
-// Mobile / narrow overrides — sarmal lies HORIZONTALLY (no diagonal
-// roll) in the upper half of the frame, essay drops into the bottom
-// band. Camera looks slightly down so the wave sits high on-screen.
+// Mobile / narrow overrides — sarmal lies HORIZONTALLY and is
+// TRANSLATED UP in world so it clearly sits in the top ~1/3 of the
+// frame, above the bottom essay band. Camera lookAt stays at origin.
 const MOBILE_BREAKPOINT   = 820;
-const FILL_FRAC_MOBILE    = 1.05;
+const FILL_FRAC_MOBILE    = 0.95;
 const LOOKAT_OFFSET_X_M   = 0.0;
-const LOOKAT_OFFSET_Y_M   = -0.38;   // camera looks DOWN → sarmal appears in TOP half
-const BASE_Y_TILT_MOBILE  = 0.30;    // gentle perspective
+const LOOKAT_OFFSET_Y_M   = 0.0;
+const MODEL_Y_OFFSET_M    = 0.65;    // model.position.y = halfH × this (positive = higher on screen)
+const BASE_Y_TILT_MOBILE  = 0.25;    // gentle perspective
 const BASE_Z_TILT_MOBILE  = 0.0;     // no diagonal roll → horizontal wave
 
 // Intro
@@ -301,6 +302,16 @@ export class About {
         this._applyPose();
         this._frameModel();
         this._playIntro();
+
+        // Safety net — if the intro tween is throttled or skipped by
+        // the browser (some mobile Chromes with battery saver etc.),
+        // force the tubes visible after a few seconds so the sarmal
+        // can never be stuck invisible.
+        setTimeout(() => {
+          for (const m of this._tubeMats) {
+            if (m && m.opacity < 0.98) m.opacity = 1.0;
+          }
+        }, 4000);
       },
       undefined,
       (err) => console.error("[about] sarmal load failed", err),
@@ -341,6 +352,11 @@ export class About {
     const dist   = targetFrustumWidth / (2 * Math.tan(fovRad / 2) * aspect);
     const halfW  = targetFrustumWidth / 2;
     const halfH  = halfW / aspect;
+
+    // On mobile translate the model UP in world so it sits high on
+    // the screen; on desktop leave it centred and use camera lookAt
+    // offsets instead.
+    this._model.position.y = isMobile ? halfH * MODEL_Y_OFFSET_M : 0;
 
     this.camera.position.set(0, 0, dist);
     this.camera.lookAt(halfW * offX, halfH * offY, 0);
