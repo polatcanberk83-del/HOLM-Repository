@@ -33,6 +33,7 @@ import { createScene, createHalo, createProjectionPlane } from "./three/scene.js
 import { createPostProcessing }   from "./three/postprocessing.js";
 import { loadModel }              from "./three/loader.js";
 import { createUnderwaterSystem } from "./three/underwater.js";
+import matcapUrl                 from "./assets/matcap.png?url";
 
 const MEDALLION_URL = "/models/madalyon.glb"; // Draco-compressed (854KB → 64KB)
 const HDRI_URL      = "/hdri/studio.hdr";
@@ -454,19 +455,19 @@ export class ContactScene {
     template.scale.setScalar(CONFIG.medallionScale);
     template.updateMatrixWorld(true);
 
-    this.material = new THREE.MeshStandardMaterial({
-      color:           CONFIG.material.color,
-      metalness:       CONFIG.material.metalness,
-      roughness:       CONFIG.material.roughness,
-      envMapIntensity: CONFIG.material.envMapIntensity,
-      envMap:          this._medallionEnv, // ONLY on medallion materials
+    // Matcap look — a shaded sphere baked into a texture and sampled
+    // by the view-space normal. Same matcap for body and engraved
+    // text, but the text material tints its sample darker via .color
+    // so the engraving reads as recessed metal.
+    this._matcapBody = new THREE.TextureLoader().load(matcapUrl);
+    this._matcapBody.colorSpace = THREE.SRGBColorSpace;
+
+    this.material = new THREE.MeshMatcapMaterial({
+      matcap: this._matcapBody,
     });
-    this.textMaterial = new THREE.MeshStandardMaterial({
-      color:           CONFIG.engravedText.color,
-      metalness:       CONFIG.engravedText.metalness,
-      roughness:       CONFIG.engravedText.roughness,
-      envMapIntensity: CONFIG.engravedText.envMapIntensity,
-      envMap:          this._medallionEnv,
+    this.textMaterial = new THREE.MeshMatcapMaterial({
+      matcap: this._matcapBody,
+      color:  0x5a5a60,   // multiplies the matcap sample, darkening the engraving
     });
 
     template.traverse((obj) => {
@@ -954,6 +955,9 @@ export class ContactScene {
       this.renderer.forceContextLoss?.();
     }
     this.container?.parentNode?.removeChild(this.container);
+
+    this._matcapBody?.dispose?.();
+    this._matcapBody = null;
 
     this.renderer = this.scene = this.camera = null;
     this.container = this.canvas = null;

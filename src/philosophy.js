@@ -4,6 +4,7 @@ import { EffectComposer }   from "three/examples/jsm/postprocessing/EffectCompos
 import { RenderPass }       from "three/examples/jsm/postprocessing/RenderPass.js";
 import { UnrealBloomPass }  from "three/examples/jsm/postprocessing/UnrealBloomPass.js";
 import { OutputPass }       from "three/examples/jsm/postprocessing/OutputPass.js";
+import { createUnderwaterSystem } from "./three/underwater.js";
 import logoUrl              from "./assets/holm new logo.svg?url";
 import "./philosophy.css";
 
@@ -35,10 +36,13 @@ const FLUID_SOFTNESS    = 1.4;
 // deep-royal floor navy, and the halo/logo brand cobalt as the peak.
 // Ensures the fluid gradient reads as an extension of the same
 // language the visitor just left in the museum.
-const FLUID_COLOR_1     = "#08050a";   // homepage body bg
-const FLUID_COLOR_2     = "#0a1230";   // dark transition
-const FLUID_COLOR_3     = "#0e1e58";   // homepage floor navy
-const FLUID_COLOR_4     = "#1a44cc";   // homepage halo brand cobalt
+// Matched to the About page palette — deep navy at the bottom, bright
+// deep-blue at the top. Fluid sim breathes between them the same way
+// About's two-stop gradient does, keeping the two pages visually kin.
+const FLUID_COLOR_1     = "#070D23";   // near-black navy (About bottom)
+const FLUID_COLOR_2     = "#050A3C";   // interpolated
+const FLUID_COLOR_3     = "#040750";   // interpolated
+const FLUID_COLOR_4     = "#030863";   // deep blue (About top)
 
 // ─── Fluid shaders (adapted from an interactive-gradient reference) ──
 const FLUID_VERT = /* glsl */`
@@ -524,6 +528,10 @@ export class Philosophy {
       -((e.clientY / window.innerHeight) * 2 - 1),
     );
     this._pointerActive = true;
+    this._underwater?.setMouseNorm(
+      e.clientX / window.innerWidth,
+      1 - e.clientY / window.innerHeight,
+    );
     // Fluid input is in the fluid-sim texel space (half-viewport res, y-up)
     if (this._fluidMat) {
       const w = window.innerWidth,  h = window.innerHeight;
@@ -577,6 +585,9 @@ export class Philosophy {
     this._displayTarget?.dispose();
     this._fluidMat?.dispose();
     this._displayMat?.dispose();
+    // Underwater + gradient
+    this._underwater?.dispose?.();
+    this._bgGradient?.dispose?.();
     this._fluidQuadMesh?.geometry?.dispose();
 
     if (this.renderer) {
@@ -683,9 +694,13 @@ export class Philosophy {
     this.renderer.outputColorSpace    = THREE.SRGBColorSpace;
 
     this.scene = new THREE.Scene();
-    // Fluid gradient — set as scene.background each frame after simulation step
-    this._initFluid();
-    this.scene.background = this._displayTarget.texture;
+    // Static two-stop gradient — matches the About page exactly. The
+    // fluid simulation is intentionally NOT initialised here so it
+    // doesn't burn GPU cycles rendering into a target nothing samples.
+    // Cached so other passes (hero plane, dispersion) can sample the
+    // same texture in place of the retired fluid displayTarget.
+    this._bgGradient       = this._makeGradientTexture("#030863", "#070D23");
+    this.scene.background  = this._bgGradient;
 
     this.camera = new THREE.PerspectiveCamera(
       36, window.innerWidth / window.innerHeight, 0.1, 100,
@@ -726,6 +741,10 @@ export class Philosophy {
       );
       this._composer.addPass(this._bloom);
     }
+    // Underwater (caustics + refraction + tint) — same treatment About
+    // uses so the two pages share the same living-liquid backdrop feel.
+    this._underwater = createUnderwaterSystem(this.renderer, { isMobile: this._isMobile });
+    this._composer.addPass(this._underwater.pass);
     this._composer.addPass(new OutputPass());
 
     // Caustic halo — desktop-only. It's an extra shader-plane draw with
@@ -973,7 +992,7 @@ export class Philosophy {
       `,
       uniforms: {
         uTextMap:     { value: tex },
-        uFluidMap:    { value: this._displayTarget.texture },
+        uFluidMap:    { value: this._bgGradient },
         uTime:        { value: 0 },
         uMouseUv:     { value: new THREE.Vector2(-2, -2) },
         uCursorFocus: { value: 0 },
@@ -1016,6 +1035,25 @@ export class Philosophy {
   // texture is set as scene.background — so the diamond's transmission
   // refracts a live black + blue gradient that flows on its own and
   // reacts to the cursor.
+  // Vertical two-stop gradient rendered into a canvas texture. Same
+  // helper as About uses so both pages share exactly one visual recipe.
+  _makeGradientTexture(top, bottom) {
+    const c = document.createElement("canvas");
+    c.width = 2; c.height = 512;
+    const g = c.getContext("2d");
+    const grad = g.createLinearGradient(0, 0, 0, 512);
+    grad.addColorStop(0, top);
+    grad.addColorStop(1, bottom);
+    g.fillStyle = grad;
+    g.fillRect(0, 0, 2, 512);
+    const tex = new THREE.CanvasTexture(c);
+    tex.colorSpace  = THREE.SRGBColorSpace;
+    tex.minFilter   = THREE.LinearFilter;
+    tex.magFilter   = THREE.LinearFilter;
+    tex.needsUpdate = true;
+    return tex;
+  }
+
   _initFluid() {
     const w = Math.max(2, Math.floor(window.innerWidth  * FLUID_RES_SCALE));
     const h = Math.max(2, Math.floor(window.innerHeight * FLUID_RES_SCALE));
@@ -1082,7 +1120,7 @@ export class Philosophy {
     this._fluidQuadMesh  = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), this._fluidMat);
     this._fluidQuadScene.add(this._fluidQuadMesh);
 
-    this._displayTarget.texture.colorSpace = THREE.SRGBColorSpace;
+    this._bgGradient.colorSpace = THREE.SRGBColorSpace;
   }
 
   _stepFluid(elapsed) {
@@ -1316,7 +1354,7 @@ export class Philosophy {
     this.scene.add(rim);
     this._lights.push(rim);
 
-    const amb = new THREE.AmbientLight(0x121826, 0.35);
+    const amb = new THREE.AmbientLight(0x121826, 0.65);
     this.scene.add(amb);
     this._lights.push(amb);
   }
@@ -1590,9 +1628,9 @@ export class Philosophy {
 
       this._elapsed += dt;
 
-      // Fluid simulation → display target — dispatched every frame BEFORE the
-      // composer so the diamond scene's background samples the fresh gradient.
-      this._stepFluid(this._elapsed);
+      // Fluid simulation retired — background is a static gradient.
+      // Underwater pass still runs its own wave sim every frame.
+      this._underwater?.update();
 
       this._composer.render();
       this._rafId = requestAnimationFrame(tick);

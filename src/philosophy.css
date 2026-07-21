@@ -4,7 +4,7 @@
   position: relative;
   color: rgba(232, 240, 252, 0.96);
   font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
-  background: #08050a;
+  background: linear-gradient(180deg, #030863 0%, #070D23 100%);
   isolation: isolate;
 }
 

@@ -1,19 +1,23 @@
-/* ═══ HOLM About — "In the Screen" ═════════════════════════════════════
-   The whole About page reads through the laptop's screen. WebGL renders
-   the desk + laptop; a CSS3D overlay drops a bright HTML display panel
-   onto the screen mesh; the page's scroll drives (1) camera zoom-in and
-   (2) an internal scroll of the article inside that display.            */
-
 .holm-about {
   position: relative;
-  color: rgba(224, 232, 246, 0.94);
-  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
-  background: #060911;
-  isolation: isolate;
   min-height: 100vh;
+  background: linear-gradient(180deg, #030863 0%, #070D23 100%);
+  isolation: isolate;
+  overflow: hidden;
+  color: rgba(232, 240, 250, 0.92);
+  font-family: var(--holm-body-font, 'Inter', system-ui, sans-serif);
 }
 
-/* Top-left brand mark — same slot as every other page */
+.holm-about__canvas {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 0;
+  display: block;
+  pointer-events: none;
+}
+
 .holm-about__brand {
   position: fixed;
   top:  max(clamp(1.2rem, 2.4vh, 2.4rem), env(safe-area-inset-top));
@@ -32,495 +36,70 @@
   width: auto;
 }
 
-/* WebGL canvas + vignette — fixed backdrop, scroll passes over */
-.holm-about__canvas {
+/* Essay — right column on desktop, vertically centred. Reveals after
+   the sarmal finishes assembling. */
+.holm-about__essay {
   position: fixed;
-  inset: 0;
-  width: 100vw;
-  height: 100vh;
-  z-index: 0;
-  display: block;
-  pointer-events: none;
-}
-.holm-about__vignette {
-  position: fixed;
-  inset: 0;
-  z-index: 1;
-  pointer-events: none;
-  background:
-    radial-gradient(circle at 50% 55%,
-      transparent 0%,
-      transparent 22%,
-      rgba(0, 0, 0, 0.55) 55%,
-      rgba(0, 0, 0, 0.95) 82%,
-      #000 100%),
-    linear-gradient(to bottom,
-      rgba(0, 0, 0, 0.65) 0%,
-      transparent 12%,
-      transparent 78%,
-      rgba(0, 0, 0, 0.85) 100%);
-}
-
-/* Scroll spacer — invisible container that provides the scroll length.
-   Each 100vh div = one "beat" of scroll travel. The visible article
-   inside the CSS3D screen is driven from these scroll values. */
-.holm-about__scroll {
-  position: relative;
-  z-index: 2;
-}
-.holm-about__spacer {
-  height: 100vh;
-  pointer-events: none;
-}
-
-/* Screen-reader-only alternative — plain text of the whole article for
-   assistive tech. Visible content is inside the CSS3D projection. */
-.sr-only {
-  position: absolute;
-  width: 1px; height: 1px;
-  padding: 0; margin: -1px;
-  overflow: hidden;
-  clip: rect(0, 0, 0, 0);
-  white-space: nowrap;
-  border: 0;
-}
-
-/* ═══ The laptop screen (CSS3D projected DOM) ═══════════════════════════
-   Rendered via CSS3DRenderer onto a plane at the laptop's display mesh.
-   Fixed pixel size (1400×875 baseline, adjusted in JS to match aspect);
-   CSS3DObject scales it down to the laptop's actual world size.        */
-
-.holm-about__screen {
-  position: relative;
-  width: 1400px;
-  height: 875px;
-  overflow: hidden;
-  border-radius: 6px;
-  background:
-    /* Very subtle backlight bleed at top + bottom edges */
-    linear-gradient(180deg,
-      rgba(220, 230, 245, 0.35) 0%,
-      transparent 5%,
-      transparent 95%,
-      rgba(220, 230, 245, 0.25) 100%),
-    /* Clean white with a barely-there cool cast (a real IPS panel) */
-    #fbfbfb;
-  color: #0d0d0d;
-  font-family: 'Fraunces', 'Times New Roman', serif;
-  /* Bezel + inner glow — screen edges brighten slightly (backlight leak) */
-  box-shadow:
-    inset 0 0 0 3px rgba(250, 250, 250, 0.9),
-    inset 0 0 40px rgba(230, 230, 240, 0.35),
-    inset 0 0 220px rgba(30, 30, 40, 0.05);
-  padding: 100px 120px;
-  box-sizing: border-box;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-}
-/* Fine noise + scanline overlay for that "actual screen" texture. Very
-   subtle — you shouldn't notice it as a filter, just as "not flat". */
-.holm-about__screen::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background-image:
-    repeating-linear-gradient(
-      0deg,
-      transparent 0px, transparent 2px,
-      rgba(0, 0, 0, 0.014) 2px, rgba(0, 0, 0, 0.014) 3px),
-    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' seed='4' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.10  0 0 0 0 0.10  0 0 0 0 0.10  0 0 0 0.08 0'/></filter><rect width='220' height='220' filter='url(%23n)'/></svg>");
-  background-size: auto, 220px 220px;
-  mix-blend-mode: multiply;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.6;
-}
-/* Corner vignette — a real LCD's brightness falls off gently */
-.holm-about__screen::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  border-radius: inherit;
-  background:
-    radial-gradient(ellipse at center,
-      transparent 0%,
-      transparent 60%,
-      rgba(20, 20, 30, 0.06) 100%);
-  pointer-events: none;
-  z-index: 1;
-}
-
-/* Content column — translates Y to reveal successive sections as the
-   user scrolls the page. */
-.holm-about__screen-scroll {
-  position: relative;
+  top: 50%;
+  right: clamp(1.75rem, 5vw, 5rem);
+  transform: translateY(-50%);
   z-index: 3;
+  max-width: clamp(22rem, 32vw, 34rem);
+  font-family: var(--holm-display-font, 'Fraunces', 'Times New Roman', serif);
+  font-size: clamp(1rem, 1.15vw, 1.2rem);
+  line-height: 1.55;
+  color: rgba(234, 240, 252, 0.94);
+  letter-spacing: 0.005em;
+  pointer-events: none;
+}
+
+/* Line mask — wrapper clips overflow, inner line slides up. Padding
+   leaves headroom for descenders (g, y, p); negative margin cancels the
+   visual gap so line spacing feels tight and deliberate. */
+.holm-about__line-wrap {
+  overflow: hidden;
+  padding: 0.14em 0 0.22em;
+  margin: -0.14em 0 -0.06em;
+}
+.holm-about__line {
+  display: block;
   will-change: transform;
-  transform: translate3d(0, 0, 0);
-  text-align: left;
+  transform: translateY(110%);
 }
 
-.holm-about__scr-section {
-  padding: 0 0 160px;
-  position: relative;
-}
-.holm-about__scr-section:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  top: -80px;
-  left: 0;
-  width: 60px;
-  height: 1px;
-  background: rgba(20, 20, 20, 0.28);
-}
-.holm-about__scr-section:last-child {
-  padding-bottom: 40px;
-}
-
-/* Portrait — B/W, editorial. Only on the intro section. */
-.holm-about__scr-portrait {
-  width: 220px;
-  height: 290px;
-  margin-bottom: 46px;
-  overflow: hidden;
-  background: #d0cabc;
-  border-radius: 1px;
-  filter: sepia(0.06);
-}
-.holm-about__scr-portrait img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 22%;
-  filter: grayscale(1) contrast(1.04) brightness(0.96);
-}
-
-/* Section marker — "§ 01" style monospace-ish tag with hairline rule.
-   Kills the "01 / Introduction" magazine cliché that reads AI-authored.
-   Uses Fraunces at unusual weight + wide tracking for a printerly feel. */
-.holm-about__scr-eyebrow {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 16px;
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-style: normal;
-  font-size: 26px;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: rgba(20, 20, 20, 0.7);
-  margin-bottom: 60px;
-  padding-bottom: 4px;
-}
-.holm-about__scr-eyebrow::before {
-  content: "§";
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: 32px;
-  color: rgba(20, 20, 20, 0.55);
-  letter-spacing: 0;
-}
-
-/* Headline — Fraunces at book weight, upright. Smaller than before to
-   let the eyebrows breathe and body text feel more grounded. */
-.holm-about__scr-head {
-  font-family: 'Fraunces', serif;
-  font-style: normal;
-  font-weight: 350;
-  font-size: 58px;
-  line-height: 0.99;
-  letter-spacing: -0.018em;
-  color: #050505;
-  margin: 0 0 28px;
-  max-width: 22ch;
-}
-.holm-about__scr-head + .holm-about__scr-head {
-  font-weight: 300;
-  color: rgba(20, 20, 20, 0.7);
-  margin-top: -10px;
-  margin-bottom: 38px;
-}
-
-/* Body text — tighter, more editorial. */
-.holm-about__scr-body {
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: 20px;
-  line-height: 1.5;
-  color: rgba(15, 15, 15, 0.86);
-  margin: 0 0 20px;
-  max-width: 42ch;
-}
-.holm-about__scr-head + .holm-about__scr-body {
-  font-size: 24px;
-  font-weight: 400;
-  color: #0a0a0a;
-  max-width: 38ch;
-  line-height: 1.45;
-}
-.holm-about__scr-body:last-child { margin-bottom: 0; }
-
-/* Selected work — image + external link */
-.holm-about__scr-work {
-  display: block;
-  width: 660px;
-  aspect-ratio: 16 / 10;
-  margin: 42px 0 30px;
-  overflow: hidden;
-  border-radius: 3px;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.3);
-}
-.holm-about__scr-work img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-.holm-about__scr-link {
-  display: inline-block;
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-size: 26px;
-  color: #000;
-  text-decoration: none;
-  border-bottom: 1.5px solid rgba(0, 0, 0, 0.5);
-  padding: 8px 0;
-  margin-top: 12px;
-  transition: color 0.3s ease, border-color 0.3s ease;
-  pointer-events: auto;
-}
-.holm-about__scr-work,
-.holm-about__scr-cta {
-  pointer-events: auto;
-}
-.holm-about__scr-link:hover {
-  color: #d13030;
-  border-color: #d13030;
-}
-
-/* CTA — the final "Say Hello" pill inside the screen. Static — no reveal,
-   no hover scale. Just a button. */
-.holm-about__scr-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 60px;
-  padding: 24px 62px;
-  background: #000;
-  color: #ffffff;
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: 34px;
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  border-radius: 999px;
-}
-
-/* ═══ Mobile fallback article ═══════════════════════════════════════════
-   On phones the CSS3D-projected laptop screen would be unreadable, so we
-   render the same content in the page flow instead. Same section markup,
-   different container class → different type scale + layout.           */
-
-.holm-about__mobile-article {
-  display: none;                           /* desktop hides it */
-  position: relative;
-  z-index: 4;
-  padding: 14vh 6vw 14vh;
-  padding-top:    max(14vh, calc(4vh + env(safe-area-inset-top)));
-  padding-bottom: max(14vh, calc(4vh + env(safe-area-inset-bottom)));
-  padding-left:   max(6vw, env(safe-area-inset-left));
-  padding-right:  max(6vw, env(safe-area-inset-right));
-  color: rgba(232, 238, 248, 0.95);
-  text-align: left;
-}
-.holm-about__mobile-article .holm-about__scr-section {
-  padding: 0 0 110px;
-  position: relative;
-}
-.holm-about__mobile-article .holm-about__scr-section:last-child {
-  padding-bottom: 0;
-}
-.holm-about__mobile-article .holm-about__scr-section:not(:first-child)::before {
-  content: "";
-  position: absolute;
-  top: -56px;
-  left: 0;
-  width: 56px;
-  height: 1px;
-  background: rgba(200, 220, 245, 0.28);
-}
-
-.holm-about__mobile-article .holm-about__scr-portrait {
-  width: clamp(150px, 42vw, 220px);
-  aspect-ratio: 3 / 4;
-  height: auto;
-  margin: 0 0 34px;
-  overflow: hidden;
-  border-radius: 2px;
-  background: rgba(30, 40, 60, 0.4);
-  filter: none;
-}
-.holm-about__mobile-article .holm-about__scr-portrait img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: center 22%;
-  filter: grayscale(1) contrast(1.06);
-}
-
-/* Eyebrow — bigger to match the desktop hierarchy */
-.holm-about__mobile-article .holm-about__scr-eyebrow {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 12px;
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-style: normal;
-  font-size: clamp(0.95rem, 4vw, 1.1rem);
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
-  color: rgba(195, 215, 240, 0.82);
-  margin: 0 0 32px;
-  padding: 0;
-}
-.holm-about__mobile-article .holm-about__scr-eyebrow::before {
-  content: "§";
-  font-family: 'Fraunces', serif;
-  font-size: 1.25em;
-  font-weight: 400;
-  color: rgba(195, 215, 240, 0.6);
-  letter-spacing: 0;
-}
-
-.holm-about__mobile-article .holm-about__scr-head {
-  font-family: 'Fraunces', serif;
-  font-style: normal;
-  font-weight: 350;
-  font-size: clamp(1.6rem, 7vw, 2.3rem);
-  line-height: 1.05;
-  letter-spacing: -0.02em;
-  color: #ffffff;
-  margin: 0 0 20px;
-  max-width: 22ch;
-  text-shadow: 0 1px 22px rgba(0, 0, 0, 0.55);
-}
-.holm-about__mobile-article .holm-about__scr-head + .holm-about__scr-head {
-  font-weight: 300;
-  color: rgba(255, 255, 255, 0.72);
-  margin-top: -4px;
-  margin-bottom: 28px;
-}
-
-.holm-about__mobile-article .holm-about__scr-body {
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: clamp(0.98rem, 4.2vw, 1.15rem);
-  line-height: 1.58;
-  color: rgba(224, 232, 246, 0.88);
-  margin: 0 0 18px;
-  max-width: 44ch;
-  text-shadow: 0 1px 20px rgba(0, 0, 0, 0.5);
-}
-.holm-about__mobile-article .holm-about__scr-head + .holm-about__scr-body {
-  font-size: clamp(1.05rem, 4.6vw, 1.28rem);
-  color: rgba(240, 246, 254, 0.96);
-  margin-bottom: 22px;
-}
-
-.holm-about__mobile-article .holm-about__scr-work {
-  display: block;
-  width: 100%;
-  max-width: 460px;
-  aspect-ratio: 16 / 10;
-  margin: 34px 0 22px;
-  overflow: hidden;
-  border-radius: 3px;
-  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.5);
-}
-.holm-about__mobile-article .holm-about__scr-work img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.holm-about__mobile-article .holm-about__scr-link {
-  display: inline-block;
-  font-family: 'Fraunces', serif;
-  font-weight: 500;
-  font-size: clamp(0.95rem, 4vw, 1.08rem);
-  color: rgba(215, 228, 250, 0.94);
-  text-decoration: none;
-  border-bottom: 1px solid rgba(200, 220, 250, 0.4);
-  padding: 6px 0;
-  margin-top: 8px;
-}
-.holm-about__mobile-article .holm-about__scr-link:hover {
-  color: #fff;
-  border-color: #fff;
-}
-
-.holm-about__mobile-article .holm-about__scr-cta {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-top: 42px;
-  padding: 20px 52px;
-  background: #ffffff;
-  color: #0a0a0a;
-  font-family: 'Fraunces', serif;
-  font-weight: 400;
-  font-size: clamp(1.02rem, 4vw, 1.18rem);
-  letter-spacing: 0.02em;
-  text-decoration: none;
-  border-radius: 999px;
-  box-shadow: 0 14px 40px rgba(120, 160, 235, 0.24);
-}
-
-/* ─── Tablet — still uses desktop CSS3D screen ────────────────────── */
-@media (max-width: 1023px) and (min-width: 768px) {
-  /* CSS3D screen scales down naturally with the laptop's on-screen size */
-}
-
-/* ─── Mobile — pure editorial, WebGL disabled ────────────────────── */
-@media (max-width: 767px) {
-  /* Kill every WebGL surface — mobile runs pure DOM for perf + clarity */
-  .holm-about__canvas   { display: none; }
-  .holm-about__vignette { display: none; }
-  .holm-about__spacer   { display: none; }
-
-  /* Container now provides the atmosphere itself */
-  .holm-about {
-    background:
-      radial-gradient(ellipse at 50% 20%,
-        #0b1120 0%,
-        #06080f 60%,
-        #030509 100%);
-    min-height: 100vh;
+/* Mobile / narrow — essay drops to a bottom band, the sarmal auto-
+   reframes to the top half via the JS mobile framing preset. */
+@media (max-width: 820px) {
+  .holm-about__essay {
+    top: auto;
+    right: clamp(1rem, 5vw, 1.5rem);
+    left:  clamp(1rem, 5vw, 1.5rem);
+    bottom: clamp(1.25rem, 4vh, 2.5rem);
+    transform: none;
+    max-width: none;
+    font-size: clamp(0.92rem, 3.5vw, 1.05rem);
+    line-height: 1.5;
+    background: linear-gradient(
+      to top,
+      rgba(7, 13, 35, 0.88) 0%,
+      rgba(7, 13, 35, 0.55) 60%,
+      rgba(7, 13, 35, 0) 100%
+    );
+    padding: 3rem 0 0.5rem;
   }
-
-  .holm-about__brand img { height: clamp(24px, 5vw, 36px); }
-
-  /* Show the article */
-  .holm-about__mobile-article { display: block; }
-}
-.holm-about.is-mobile {
-  background:
-    radial-gradient(ellipse at 50% 20%,
-      #0b1120 0%,
-      #06080f 60%,
-      #030509 100%);
-}
-.holm-about.is-mobile .holm-about__canvas,
-.holm-about.is-mobile .holm-about__vignette,
-.holm-about.is-mobile .holm-about__spacer {
-  display: none;
 }
 
-/* ─── Reduced motion ─────────────────────────────────────────────── */
-.holm-about.is-reduced-motion .holm-about__screen-scroll {
-  transition: none !important;
+/* Very narrow — tighter type, fewer lines visible without scroll. */
+@media (max-width: 480px) {
+  .holm-about__essay {
+    font-size: clamp(0.86rem, 3.4vw, 0.98rem);
+    line-height: 1.44;
+  }
+  .holm-about__line-wrap {
+    padding: 0.10em 0 0.16em;
+    margin:  -0.10em 0 -0.04em;
+  }
 }
+
+.holm-about.is-reduced-motion .holm-about__essay { opacity: 1; }
+.holm-about.is-reduced-motion .holm-about__line  { transform: none; }
