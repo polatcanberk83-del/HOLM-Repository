@@ -26,12 +26,15 @@ const FILL_FRAC       = 1.220;
 const LOOKAT_OFFSET_X = 0.370;   // +ve pushes model LEFT so essay has room on the right
 const LOOKAT_OFFSET_Y = -0.360;
 
-// Mobile / narrow overrides — sarmal recentres, sits above the essay
-// which drops into the bottom band. Smaller fill so it doesn't crowd.
+// Mobile / narrow overrides — sarmal lies HORIZONTALLY (no diagonal
+// roll) in the upper half of the frame, essay drops into the bottom
+// band. Camera looks slightly down so the wave sits high on-screen.
 const MOBILE_BREAKPOINT   = 820;
-const FILL_FRAC_MOBILE    = 0.95;
+const FILL_FRAC_MOBILE    = 1.05;
 const LOOKAT_OFFSET_X_M   = 0.0;
-const LOOKAT_OFFSET_Y_M   = 0.40;   // shift camera down → sarmal appears in TOP half
+const LOOKAT_OFFSET_Y_M   = -0.38;   // camera looks DOWN → sarmal appears in TOP half
+const BASE_Y_TILT_MOBILE  = 0.30;    // gentle perspective
+const BASE_Z_TILT_MOBILE  = 0.0;     // no diagonal roll → horizontal wave
 
 // Intro
 const INTRO_DELAY        = 0.25;
@@ -286,16 +289,16 @@ export class About {
         entries.forEach((entry, rank) => { this._tubeRevealOrder[entry.i] = rank; });
 
         // Nested transforms so the two rotations don't interfere:
-        //   tilt (outer)   ← Y/Z base pose
+        //   tilt (outer)   ← Y/Z base pose (mobile-aware)
         //   root (inner)   ← continuous X spin around the tubes' own
         //                    long axis, unaffected by the tilt above.
         const tilt = new THREE.Group();
-        tilt.rotation.set(0, BASE_Y_TILT, BASE_Z_TILT);
         tilt.add(root);
 
         this.scene.add(tilt);
         this._model   = tilt;
         this._spinner = root;
+        this._applyPose();
         this._frameModel();
         this._playIntro();
       },
@@ -306,6 +309,17 @@ export class About {
 
   // Frame the (rotated) model so it fills FILL_FRAC of the viewport
   // width, with a lookAt offset pushing it left/right and up/down.
+  // Apply the tilt appropriate for the current viewport. Called on
+  // load and again on resize so a device rotation snaps to the right
+  // pose without a reload.
+  _applyPose() {
+    if (!this._model) return;
+    const isMobile = window.innerWidth < MOBILE_BREAKPOINT;
+    const yTilt = isMobile ? BASE_Y_TILT_MOBILE : BASE_Y_TILT;
+    const zTilt = isMobile ? BASE_Z_TILT_MOBILE : BASE_Z_TILT;
+    this._model.rotation.set(0, yTilt, zTilt);
+  }
+
   _frameModel() {
     if (!this._model) return;
     this._model.updateMatrixWorld(true);
@@ -395,6 +409,9 @@ export class About {
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(w, h);
     this.composer.setSize(w, h);
-    if (this._model) this._frameModel();
+    if (this._model) {
+      this._applyPose();
+      this._frameModel();
+    }
   }
 }
