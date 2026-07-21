@@ -53,18 +53,16 @@
   pointer-events: none;
 }
 
-/* Line mask — wrapper clips overflow, inner line slides up. Padding
-   leaves headroom for descenders (g, y, p); negative margin cancels the
-   visual gap so line spacing feels tight and deliberate. */
+/* Line wrap keeps padding for descender headroom (g, y, p); the mask
+   is applied at animation time only — text is visible by default so a
+   failed intro can't leave it hidden. */
 .holm-about__line-wrap {
-  overflow: hidden;
   padding: 0.14em 0 0.22em;
   margin: -0.14em 0 -0.06em;
 }
 .holm-about__line {
   display: block;
-  will-change: transform;
-  transform: translateY(110%);
+  will-change: transform, opacity;
 }
 
 /* Mobile / narrow — essay drops to a bottom band, the sarmal auto-

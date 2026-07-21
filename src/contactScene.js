@@ -465,9 +465,10 @@ export class ContactScene {
     this.material = new THREE.MeshMatcapMaterial({
       matcap: this._matcapBody,
     });
-    this.textMaterial = new THREE.MeshMatcapMaterial({
-      matcap: this._matcapBody,
-      color:  0x5a5a60,   // multiplies the matcap sample, darkening the engraving
+    // Engraved TALK / WRITE glyphs — flat pure white so they read
+    // cleanly against the matcap-shaded silver body.
+    this.textMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
     });
 
     template.traverse((obj) => {

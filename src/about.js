@@ -99,9 +99,32 @@ export class About {
     this._createDOM();
     this._createThree();
     this._loadSarmal();
+    this._playTextReveal();   // independent of model load — text always appears
     window.addEventListener("resize", this._onResize);
     window.addEventListener("pointermove", this._onPointer, { passive: true });
     this._startLoop();
+  }
+
+  // Essay reveal — decoupled from the model so text lands even if the
+  // GLTF is slow or fails. Uses opacity + a small y-slide (no mask),
+  // so if this tween never runs the CSS default is already visible.
+  _playTextReveal() {
+    const lines = [...this.container.querySelectorAll(".holm-about__line")];
+    if (!lines.length) return;
+    if (this.reduced) return;   // CSS default is visible; nothing to do
+
+    // Hide them just before the tween — narrow window where they might
+    // flash visible for one frame is acceptable and beats leaving them
+    // stuck hidden forever if this method somehow bails.
+    gsap.set(lines, { opacity: 0, y: 18 });
+    gsap.to(lines, {
+      opacity: 1,
+      y:       0,
+      duration: 0.7,
+      stagger:  LINE_STAGGER,
+      ease:     "power3.out",
+      delay:    INTRO_DELAY + TEXT_OFFSET,
+    });
   }
 
   destroy() {
@@ -309,13 +332,11 @@ export class About {
     this.camera.lookAt(halfW * offX, halfH * offY, 0);
   }
 
+  // Model-only intro — text reveal is handled separately in _playTextReveal
+  // so the two beats don't rely on each other.
   _playIntro() {
-    const lines = [...this.container.querySelectorAll(".holm-about__line")];
-    gsap.set(lines, { yPercent: 110 });
-
     if (this.reduced) {
       this._tubeMats.forEach((m) => { m.opacity = 1.0; });
-      gsap.set(lines, { yPercent: 0 });
       return;
     }
 
@@ -332,13 +353,6 @@ export class About {
         ease: "power2.out",
       }, rank * gap);
     });
-
-    tl.to(lines, {
-      yPercent: 0,
-      duration: 0.75,
-      stagger:  LINE_STAGGER,
-      ease:     "power3.out",
-    }, TEXT_OFFSET);
   }
 
   // ── Loop ───────────────────────────────────────────────────────────
