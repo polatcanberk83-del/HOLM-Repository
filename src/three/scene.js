@@ -118,6 +118,26 @@ export function createScene(canvas, isMobile = false) {
   rightWall.receiveShadow = true;
   scene.add(rightWall);
 
+  // ── End wall (was the projection wall) — same marble treatment as
+  //    the corridor sides, sized 20×8 to cap the room. Cloned texture
+  //    with a lower repeat so the tile size stays consistent.
+  const endWallTex = new THREE.TextureLoader().load(marbleWallUrl);
+  endWallTex.colorSpace = THREE.SRGBColorSpace;
+  endWallTex.wrapS = THREE.RepeatWrapping;
+  endWallTex.wrapT = THREE.RepeatWrapping;
+  endWallTex.repeat.set(2.4, 1);   // 20 / 8.5-unit tile ≈ 2.4 repeats
+  endWallTex.anisotropy = 8;
+  const endWallMat = new THREE.MeshStandardMaterial({
+    map:       endWallTex,
+    color:     0x656570,
+    roughness: 0.78,
+    metalness: 0.00,
+  });
+  const endWall = new THREE.Mesh(new THREE.PlaneGeometry(20, 8), endWallMat);
+  endWall.position.set(0, 4, -89.9);   // normal defaults to +Z, facing camera
+  endWall.receiveShadow = true;
+  scene.add(endWall);
+
   // ---------- Lighting ----------
   // THREE.js 0.184 fiziksel birim: intensity = candela.
   // Kullanıcının belirttiği değerler (ambient:0.4, spot:80) legacy scale —

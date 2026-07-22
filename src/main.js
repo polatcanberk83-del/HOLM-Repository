@@ -2,7 +2,7 @@ import Lenis from "lenis";
 import * as THREE from "three";
 import gsap from "gsap";
 
-import { createScene, createHalo, createProjectionPlane } from "./three/scene.js";
+import { createScene, createHalo } from "./three/scene.js";
 import { createPostProcessing } from "./three/postprocessing.js";
 import { loadModel, setLoadingManager } from "./three/loader.js";
 import { Loader }                       from "./loader.js";
@@ -15,6 +15,8 @@ import {
   SHATTER_T_ENTER,
   SHATTER_T_DISSOLVE_END,
 } from "./three/shatter.js";
+import matcapUrl from "./assets/matcap.png?url";
+import { createBrilliantGeometry, createDiamondMaterial } from "./three/diamond.js";
 
 // ---------- Device detection (must precede MODEL_DEFS) ----------
 const isMobile = window.innerWidth < 768 || "ontouchstart" in window;
@@ -64,7 +66,128 @@ const post      = createPostProcessing(renderer, scene, camera, isMobile, underw
 // Reveal factor — starts at 0 when loader finishes, eases to 1 so the scene
 // gently "wakes up" behind the iris rather than snapping to full brightness.
 let _revealF = 0;
-const projPlane = createProjectionPlane(scene, isMobile);
+
+// ---------- Final-scene abstracted model ----------
+// A GLTF with two toruses wrapping a diamond-placeholder mesh, planted
+// in front of the marble end wall so the projection copy overlay reads
+// on top of it. The placeholder is HIDDEN and replaced with the real
+// brilliant-cut diamond from three/diamond.js; the toruses get their
+// own materials (big = navy-tinted matcap, small = silver matcap) and
+// counter-rotate every frame (see tick()).
+const finalModel = {
+  root: null,
+  bigTorus: null,
+  smallTorus: null,
+  diamond: null,
+  diamondMat: null,
+};
+{
+  const matcap = new THREE.TextureLoader().load(matcapUrl);
+  matcap.colorSpace = THREE.SRGBColorSpace;
+  // Big torus — deep navy tint on the matcap (Spline-style overlay).
+  const bigMat   = new THREE.MeshMatcapMaterial({ matcap, color: 0x1a2c72 });
+  // Small torus — lighter accent blue so it reads distinct from the big one.
+  const smallMat = new THREE.MeshMatcapMaterial({ matcap, color: 0x8aa4d8 });
+  // Anything else in the model — plain silver.
+  const otherMat = new THREE.MeshMatcapMaterial({ matcap });
+
+  loadModel("/models/abstracted.glb").then((root) => {
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root);
+    const c   = new THREE.Vector3(); box.getCenter(c);
+    root.position.sub(c);
+    const size = new THREE.Vector3(); box.getSize(size);
+    const longest = Math.max(size.x, size.y, size.z) || 1;
+    root.scale.setScalar(8.0 / longest);
+
+    // DEBUG — log every node so we can see what names actually survived
+    // the Draco round-trip.
+    const _nodes = [];
+    root.traverse((n) => _nodes.push({ name: n.name, type: n.type, isMesh: !!n.isMesh }));
+    console.log("[final] all nodes:", _nodes);
+
+    // The .gltf had "Big torus" / "small torus" / "dioamand placeholder"
+    // but Draco compression can strip node names. Fall back to picking
+    // by geometry size: the two biggest meshes by bbox are the toruses.
+    const findByLoose = (needle) => {
+      let hit = null;
+      root.traverse((n) => {
+        if (hit) return;
+        if ((n.name || "").toLowerCase().includes(needle)) hit = n;
+      });
+      return hit;
+    };
+    finalModel.bigTorus   = findByLoose("big torus")   || findByLoose("big")   || findByLoose("torus001") || findByLoose("torus_1");
+    finalModel.smallTorus = findByLoose("small torus") || findByLoose("small") || findByLoose("torus002") || findByLoose("torus_2");
+    let placeholder       = findByLoose("placeholder") || findByLoose("diamond") || findByLoose("dioamand");
+
+    // Fallback — if names didn't survive, size-based selection.
+    if (!finalModel.bigTorus || !finalModel.smallTorus || !placeholder) {
+      const meshes = [];
+      root.traverse((n) => { if (n.isMesh) meshes.push(n); });
+      const sized = meshes.map((m) => {
+        const b = new THREE.Box3().setFromObject(m);
+        const s = new THREE.Vector3(); b.getSize(s);
+        return { m, vol: s.x * s.y * s.z, longest: Math.max(s.x, s.y, s.z) };
+      }).sort((a, b) => b.longest - a.longest);
+      if (!finalModel.bigTorus   && sized[0]) finalModel.bigTorus   = sized[0].m;
+      if (!finalModel.smallTorus && sized[1]) finalModel.smallTorus = sized[1].m;
+      if (!placeholder           && sized[2]) placeholder           = sized[2].m;
+    }
+    console.log("[final] bigTorus:",   finalModel.bigTorus?.name || "(unnamed)",   finalModel.bigTorus?.type);
+    console.log("[final] smallTorus:", finalModel.smallTorus?.name || "(unnamed)", finalModel.smallTorus?.type);
+    console.log("[final] placeholder:", placeholder?.name || "(unnamed)", placeholder?.type);
+
+    let placeholderWorldPos = null;
+    if (placeholder) {
+      placeholder.updateMatrixWorld(true);
+      placeholderWorldPos = new THREE.Vector3();
+      placeholder.getWorldPosition(placeholderWorldPos);
+      placeholder.visible = false;
+    }
+
+    // Assign materials. Traverse Mesh descendants of each torus ref
+    // (torus might be a Group containing the actual Mesh child) so
+    // colour reliably lands on the geometry.
+    const applyMatDeep = (obj, mat) => {
+      if (!obj) return;
+      obj.traverse((n) => { if (n.isMesh) n.material = mat; });
+    };
+    applyMatDeep(finalModel.bigTorus,   bigMat);
+    applyMatDeep(finalModel.smallTorus, smallMat);
+    // Anything else in the model gets silver — walk again and skip
+    // already-materialed toruses + placeholder.
+    root.traverse((n) => {
+      if (!n.isMesh) return;
+      if (n.material === bigMat || n.material === smallMat) return;
+      if (!n.visible) return;
+      n.material = otherMat;
+    });
+
+    // Position the model in front of the end wall, then translate.
+    // Placeholder world position was captured BEFORE this move; we'll
+    // add the same delta below so the diamond lands correctly.
+    const shift = new THREE.Vector3(0, 4.0, -84.5);
+    root.position.add(shift);
+    scene.add(root);
+    finalModel.root = root;
+
+    // Real diamond in place of the placeholder — brilliant-cut geometry
+    // + physical glass material with edge dispersion.
+    const diaGeom = createBrilliantGeometry(isMobile ? 12 : 16);
+    const diaMat  = createDiamondMaterial({ isMobile });
+    const diamond = new THREE.Mesh(diaGeom, diaMat);
+    diamond.scale.setScalar(root.scale.x * 0.85);   // fits inside the toruses
+    if (placeholderWorldPos) {
+      diamond.position.copy(placeholderWorldPos).add(shift);
+    } else {
+      diamond.position.copy(shift);
+    }
+    scene.add(diamond);
+    finalModel.diamond    = diamond;
+    finalModel.diamondMat = diaMat;
+  }).catch((err) => console.error("[HOLM] final model load failed", err));
+}
 // Shatter effect is desktop-only — the mobile spline geometry (extra
 // void_figure orbit points) makes the trigger window unreliable and the
 // mosaic tile pass is heavy on mobile GPUs. Cleaner to drop it entirely.
@@ -269,17 +392,19 @@ let projectionShown = false;
 const projOverlay   = document.getElementById("projection-overlay");
 
 function showProjection() {
-  projPlane.visible = true;
   projOverlay.classList.add("active");
-  gsap.to(projOverlay, { opacity: 1, duration: 1.2, ease: "power2.out" });
+  // Hold empty for ~2s so the viewer takes in the spinning toruses
+  // before the copy fades in on top.
+  const HOLD = 2.0;
+  gsap.to(projOverlay, { opacity: 1, duration: 1.2, delay: HOLD, ease: "power2.out" });
   const lines = projOverlay.querySelectorAll(".proj-line");
   gsap.fromTo(lines,
     { opacity: 0, y: 12 },
-    { opacity: 1, y: 0, duration: 1.0, stagger: 0.4, delay: 0.4, ease: "power2.out" },
+    { opacity: 1, y: 0, duration: 1.0, stagger: 0.4, delay: HOLD + 0.4, ease: "power2.out" },
   );
   gsap.fromTo(projOverlay.querySelector(".proj-cta"),
     { opacity: 0, y: 8 },
-    { opacity: 1, y: 0, duration: 1.0, delay: 2.6, ease: "power2.out" },
+    { opacity: 1, y: 0, duration: 1.0, delay: HOLD + 2.6, ease: "power2.out" },
   );
 }
 
@@ -288,7 +413,6 @@ function hideProjection() {
     opacity: 0, duration: 0.5,
     onComplete: () => {
       projOverlay.classList.remove("active");
-      projPlane.visible = false;
       gsap.set(".proj-line, .proj-cta", { opacity: 0, y: 0 });
     },
   });
@@ -362,7 +486,6 @@ function tick(now = 0) {
     _spotPos.set(0, 7, camera.position.z);
     _spotLook.set(0, 3.5, -89.5);
     showCaption("");
-    projPlane.material.uniforms.uTime.value = elapsed;
     if (inProjection && !projectionShown) { projectionShown = true;  showProjection(); }
     if (!inProjection && projectionShown)  { projectionShown = false; hideProjection(); }
   } else if (inOrbit) {
@@ -378,7 +501,6 @@ function tick(now = 0) {
     _spotLook.set(0, 0.5, camera.position.z - 8);
     if (dist > ORBIT_R * 3) showCaption("");
     if (projectionShown) { projectionShown = false; hideProjection(); }
-    projPlane.visible = false;
   }
 
   _lookNow.lerp(_lookTarget, 0.07);
@@ -394,6 +516,25 @@ function tick(now = 0) {
   if (post.bokeh)         post.bokeh.uniforms["focus"].value       = dist;
   if (post.grainVignette) post.grainVignette.uniforms.uTime.value  = elapsed;
   wallUniforms.uTime.value = elapsed;
+
+  // Counter-rotating toruses. Rotate on TWO axes so we're guaranteed
+  // to see motion regardless of which axis the imported torus uses
+  // for its symmetry (rotation on the symmetry axis is invisible).
+  if (finalModel.bigTorus) {
+    finalModel.bigTorus.rotation.x =  elapsed * 0.55;
+    finalModel.bigTorus.rotation.z =  elapsed * 0.35;
+  }
+  if (finalModel.smallTorus) {
+    finalModel.smallTorus.rotation.x = -elapsed * 0.75;
+    finalModel.smallTorus.rotation.z = -elapsed * 0.50;
+  }
+  // Diamond idle spin + edge-dispersion shader uniform.
+  if (finalModel.diamond) {
+    finalModel.diamond.rotation.y = elapsed * 0.20;
+  }
+  if (finalModel.diamondMat?.userData?.uEdgeTime) {
+    finalModel.diamondMat.userData.uEdgeTime.value = elapsed;
+  }
 
   // Underwater wave step — pointer.x defaults to -9 (offscreen), which
   // maps to negative normalized coords → setMouseNorm treats as "no touch"
